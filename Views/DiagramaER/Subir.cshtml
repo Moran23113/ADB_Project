@@ -1,0 +1,24 @@
+﻿@{
+    ViewData["Title"] = "Generar diagrama (Chen) desde .bak";
+}
+<h2>@ViewData["Title"]</h2>
+<form asp-action="Subir" method="post" enctype="multipart/form-data">
+    <div class="form-group">
+        <label>Archivo .bak</label>
+        <input type="file" name="archivoBak" class="form-control" accept=".bak" />
+    </div>
+    <button class="btn btn-primary mt-2">Generar diagrama</button>
+</form>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="text-danger mt-3">
+        @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@e.ErrorMessage</div>
+        }
+    </div>
+}
+@if (TempData["msg"] != null)
+{
+    <div class="alert alert-info mt-3">@TempData["msg"]</div>
+}
