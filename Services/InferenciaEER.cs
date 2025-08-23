@@ -109,10 +109,10 @@ public static class InferenciaEER
             };
 
             var supId = San(h.Supertipo);
-            sb.AppendLine($"{supId}[\"{Esc(h.Supertipo)}\\n({tagDis},{tagTot})\"]:::super");
+            sb.AppendLine($"{supId}[\"{Esc(h.Supertipo)} ({tagDis},{tagTot})\"]:::super");
 
             var genId = $"GEN_{k++}_{supId}";
-            sb.AppendLine($"{genId}[[generalization]]:::note");
+            sb.AppendLine($"{genId}[[especializacion]]:::note");
             sb.AppendLine($"{genId} --> {supId}");
 
             foreach (var sub in h.Subtipos.Distinct(StringComparer.OrdinalIgnoreCase))
