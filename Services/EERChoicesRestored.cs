@@ -4,16 +4,25 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Persistencia de elecciones EER (Disyunción / Totalidad) dentro de la BD restaurada.
+/// Crea y usa la tabla interna dbo.EER_UserChoices (clave compuesta: Supertype + SubtypesCsv).
+/// </summary>
 public static class EERChoicesRestored
 {
-    // Construye cadena hacia la BD restaurada usando "SqlMaestra" pero cambiando InitialCatalog
+    /// <summary>
+    /// Construye la cadena a la BD restaurada reutilizando servidor/credenciales de "SqlMaestra".
+    /// </summary>
     public static string BuildCnnToRestoredDb(IConfiguration cfg, string nombreBD)
     {
         var csb = new SqlConnectionStringBuilder(cfg.GetConnectionString("SqlMaestra"));
-        csb.InitialCatalog = nombreBD; // apuntar a la BD restaurada
+        csb.InitialCatalog = nombreBD;
         return csb.ToString();
     }
 
+    /// <summary>
+    /// Asegura la existencia de dbo.EER_UserChoices en la BD (idempotente).
+    /// </summary>
     public static async Task EnsureTableAsync(string cnn)
     {
         const string sql = @"
@@ -33,6 +42,9 @@ END";
         await cmd.ExecuteNonQueryAsync();
     }
 
+    /// <summary>
+    /// Guarda (MERGE) las elecciones por Supertype/SubtypesCsv.
+    /// </summary>
     public static async Task SaveChoicesAsync(
         string cnn,
         Dictionary<string, string> disyuncion,
@@ -67,6 +79,9 @@ VALUES (@sup, @subs, @dis, @tot);";
         }
     }
 
+    /// <summary>
+    /// Carga todas las elecciones almacenadas.
+    /// </summary>
     public static async Task<List<(string sup, string subs, string dis, string tot)>> LoadChoicesAsync(string cnn)
     {
         await EnsureTableAsync(cnn);
