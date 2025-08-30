@@ -35,6 +35,7 @@ public class DiagramaErController : Controller
     private readonly LectorEsquemaSql _lector;
     private readonly ConstructorDiagramaChen _constructor;
 
+
     /// <summary>
     /// Crea una nueva instancia del controlador.
     /// </summary>

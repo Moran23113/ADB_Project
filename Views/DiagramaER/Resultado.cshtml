@@ -9,10 +9,18 @@
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h3>Modelo (Chen) de @nombreBD</h3>
+     <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary"
+           asp-controller="Relacional"
+           asp-action="ModeloR"
+           asp-route-nombreBD="@nombreBD">
+            Ver Modelo Relacional
+        </a>
     <form asp-action="EliminarBase" method="post" onsubmit="return confirm('¿Eliminar la base restaurada?');">
         <input type="hidden" name="nombreBD" value="@nombreBD" />
         <button class="btn btn-outline-danger">Eliminar BD</button>
     </form>
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>

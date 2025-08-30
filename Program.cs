@@ -5,6 +5,8 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<ServicioRestauracionSql>();
 builder.Services.AddSingleton<LectorEsquemaSql>();
 builder.Services.AddSingleton<ConstructorDiagramaChen>();
+builder.Services.AddSingleton<ConstructorDiagramaRelacional>();
+
 
 var app = builder.Build();
 
