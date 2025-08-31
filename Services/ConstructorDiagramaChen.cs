@@ -17,38 +17,6 @@ public class ConstructorDiagramaChen
     private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
 
     /// <summary>
-    /// Sanea un identificador para que sea válido en Mermaid:
-    /// - Reemplaza caracteres no permitidos por "_".
-    /// - Si no inicia con letra, antepone "N_".
-    /// - Limita a 60 caracteres (Mermaid puede romper con IDs larguísimos).
-    /// </summary>
-    private static string San(string? id)
-    {
-        var s = id ?? "X";
-        s = _idBad.Replace(s, "_");
-        if (string.IsNullOrEmpty(s) || !char.IsLetter(s[0]))
-            s = "N_" + s;
-        if (s.Length > 60) s = s[..60];
-        return s;
-    }
-
-    /// <summary>
-    /// Escapa texto para que no rompa el parser de Mermaid:
-    /// - Backslashes, comillas, saltos de línea y llaves.
-    /// </summary>
-    private static string Esc(string? txt)
-    {
-        if (string.IsNullOrEmpty(txt)) return "";
-        return txt
-            .Replace("\\", "\\\\")   // backslash
-            .Replace("\"", "\\\"")   // comillas
-            .Replace("\r", " ")      // CR
-            .Replace("\n", " ")      // LF
-            .Replace("{", "\\{")     // llaves
-            .Replace("}", "\\}");    // llaves
-    }
-
-    /// <summary>
     /// Construye el diagrama Mermaid (flowchart LR) en notación tipo Chen.
     /// </summary>
     /// <param name="s">Instantánea del esquema (tablas, columnas, FKs, tablas puente, etc.).</param>
@@ -71,7 +39,16 @@ public class ConstructorDiagramaChen
         sb.AppendLine("classDef clave font-weight:bold,text-decoration:underline;");
         sb.AppendLine("classDef unico stroke-dasharray:3 2;");
 
-        // -------- Entidades --------
+        ConstruirEntidades(s, sb, ocultas);
+        ConstruirRelacionesBinarias(s, sb, ocultas);
+        ConstruirRelacionesMuchosAMuchos(s, sb, ocultas);
+        AgregarNotasEntidadesDebiles(s, sb, ocultas);
+
+        return sb.ToString();
+    }
+
+    private static void ConstruirEntidades(InstantaneaEsquema s, StringBuilder sb, HashSet<string> ocultas)
+    {
         foreach (var t in s.Tablas)
         {
             if (ocultas.Contains(t.Nombre)) continue; // 👈 filtra EER_UserChoices
@@ -91,8 +68,10 @@ public class ConstructorDiagramaChen
                 sb.AppendLine($"  {attrId} --- {entId}");
             }
         }
+    }
 
-        // -------- Relaciones binarias (FKs) --------
+    private static void ConstruirRelacionesBinarias(InstantaneaEsquema s, StringBuilder sb, HashSet<string> ocultas)
+    {
         int r = 0;
         foreach (var fk in s.LlavesForaneas)
         {
@@ -112,8 +91,10 @@ public class ConstructorDiagramaChen
             else
                 sb.AppendLine($"  {relId} -. \"{mult}\" .-> {San(fk.TablaHija)}");
         }
+    }
 
-        // -------- Relaciones M:N --------
+    private static void ConstruirRelacionesMuchosAMuchos(InstantaneaEsquema s, StringBuilder sb, HashSet<string> ocultas)
+    {
         foreach (var jt in s.TablasUnionMuchosAMuchos)
         {
             if (ocultas.Contains(jt)) continue; // 👈 filtra
@@ -146,12 +127,45 @@ public class ConstructorDiagramaChen
                 }
             }
         }
+    }
 
+    private static void AgregarNotasEntidadesDebiles(InstantaneaEsquema s, StringBuilder sb, HashSet<string> ocultas)
+    {
         foreach (var w in s.EntidadesDebiles)
             if (!ocultas.Contains(w)) // 👈 también aquí
                 sb.AppendLine($"  %% {w} es ENTIDAD DEBIL (PK incluye FK)");
-
-        return sb.ToString();
     }
 
+    /// <summary>
+    /// Sanea un identificador para que sea válido en Mermaid:
+    /// - Reemplaza caracteres no permitidos por "_".
+    /// - Si no inicia con letra, antepone "N_".
+    /// - Limita a 60 caracteres (Mermaid puede romper con IDs larguísimos).
+    /// </summary>
+    private static string San(string? id)
+    {
+        var s = id ?? "X";
+        s = _idBad.Replace(s, "_");
+        if (string.IsNullOrEmpty(s) || !char.IsLetter(s[0]))
+            s = "N_" + s;
+        if (s.Length > 60) s = s[..60];
+        return s;
+    }
+
+    /// <summary>
+    /// Escapa texto para que no rompa el parser de Mermaid:
+    /// - Backslashes, comillas, saltos de línea y llaves.
+    /// </summary>
+    private static string Esc(string? txt)
+    {
+        if (string.IsNullOrEmpty(txt)) return "";
+        return txt
+            .Replace("\\", "\\\\")   // backslash
+            .Replace("\"", "\\\"")   // comillas
+            .Replace("\r", " ")      // CR
+            .Replace("\n", " ")      // LF
+            .Replace("{", "\\{")     // llaves
+            .Replace("}", "\\}");    // llaves
+    }
 }
+
