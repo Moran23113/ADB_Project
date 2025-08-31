@@ -1,11 +1,9 @@
 ﻿// Models (pueden ir arriba del mismo archivo)
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 
 /// <summary>
 /// Información mínima de una tabla para el diagrama.
@@ -67,12 +65,17 @@ public class InstantaneaEsquema
 public class LectorEsquemaSql
 {
     private readonly string _cnnMaestra;
+    private readonly ILogger<LectorEsquemaSql> _logger;
 
     /// <summary>
     /// Crea el lector con una cadena de conexión "maestra" (server/credenciales),
     /// desde la cual se apuntará dinámicamente al catálogo de la BD restaurada.
     /// </summary>
-    public LectorEsquemaSql(IConfiguration cfg) => _cnnMaestra = cfg.GetConnectionString("SqlMaestra")!;
+    public LectorEsquemaSql(IConfiguration cfg, ILogger<LectorEsquemaSql> logger)
+    {
+        _cnnMaestra = cfg.GetConnectionString("SqlMaestra")!;
+        _logger = logger;
+    }
 
     /// <summary>
     /// Construye una cadena de conexión a una BD específica reutilizando servidor/credenciales de la cadena maestra.
@@ -83,37 +86,7 @@ public class LectorEsquemaSql
         return csb.ToString();
     }
 
-    /// <summary>
-    /// Lee el esquema (tablas, columnas, FKs, heurísticas) de la base indicada.
-    /// </summary>
-    /// <param name="nombreBD">Nombre de la base restaurada.</param>
-    /// <returns>Instantánea del esquema para diagrama ER/EER.</returns>
-    public async Task<InstantaneaEsquema> LeerAsync(string nombreBD)
-    {
-        var s = new InstantaneaEsquema();
-
-        using var cn = new SqlConnection(CnnDeBD(_cnnMaestra, nombreBD));
-        await cn.OpenAsync();
-
-        // =========================
-        // 1) TABLAS (excluye las del sistema)
-        // =========================
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "SELECT name FROM sys.tables WHERE is_ms_shipped = 0 ORDER BY name;";
-            using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-                s.Tablas.Add(new InfoTabla(rd.GetString(0)));
-        }
-
-        // =========================
-        // 2) COLUMNAS + flags PK/UNIQUE
-        //    - pkcols: columnas que conforman la PK.
-        //    - uqcols: columnas que participan en índices únicos (no PK).
-        // =========================
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = @"
+    private const string SqlColumnas = @"
 WITH pkcols AS (
   SELECT ic.object_id, ic.column_id
   FROM sys.key_constraints pk
@@ -139,28 +112,8 @@ JOIN sys.types   ty ON ty.user_type_id = c.user_type_id
 LEFT JOIN pkcols pk ON pk.object_id = t.object_id AND pk.column_id = c.column_id
 LEFT JOIN uqcols uq ON uq.object_id = t.object_id AND uq.column_id = c.column_id
 ORDER BY t.name, c.column_id;";
-            using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-            {
-                s.Columnas.Add(new InfoColumna(
-                    rd.GetString(0),             // tabla
-                    rd.GetString(1),             // columna
-                    rd.GetString(2),             // tipo
-                    rd.GetBoolean(3),            // es nulo
-                    rd.GetInt32(4) == 1,         // es pk
-                    rd.GetInt32(5) == 1));       // es único (candidato)
-            }
-        }
 
-        // =========================
-        // 3) FKs agrupadas + cardinalidad y participación
-        //    - fkg: agrupa por FK (posibles multicolumna) y mantiene orden.
-        //    - uniq_hija: pares (tabla, columnas) que están bajo algún índice único.
-        //    - fk_nullable: ***FIX*** calcula si TODAS las columnas FK son NOT NULL.
-        // =========================
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = @"
+    private const string SqlFks = @"
 WITH fkcols AS (
   SELECT fk.object_id AS fk_id, fk.name AS FK_Nombre,
          rt.name AS TablaPadre, t.name AS TablaHija,
@@ -183,7 +136,6 @@ fkg AS (
   GROUP BY fk_id
 ),
 uniq_hija AS (
-  -- Nota: i.is_unique incluye PKs; si quieres excluir PKs, agrega 'AND i.is_primary_key = 0'
   SELECT t.name AS Tabla,
          STRING_AGG(c.name, ', ') WITHIN GROUP (ORDER BY ic.key_ordinal) AS Cols
   FROM sys.indexes i
@@ -194,8 +146,6 @@ uniq_hija AS (
   GROUP BY t.name
 ),
 fk_nullable AS (
-  -- ***FIX***: queremos 1 sólo si TODAS las columnas FK son NOT NULL.
-  -- Si alguna columna de la FK es nullable -> 0.
   SELECT fkc.constraint_object_id AS fk_id,
          MIN(CASE WHEN c.is_nullable = 0 THEN 1 ELSE 0 END) AS AllNotNull
   FROM sys.foreign_key_columns fkc
@@ -213,27 +163,8 @@ SELECT g.FK_Nombre, g.TablaPadre, g.TablaHija, g.ColsPadre, g.ColsHija,
 FROM fkg g
 JOIN fk_nullable n ON n.fk_id = g.fk_id
 ORDER BY g.TablaPadre, g.TablaHija;";
-            using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-            {
-                s.LlavesForaneas.Add(new InfoLlaveForanea(
-                    rd.GetString(0),             // nombre FK
-                    rd.GetString(1),             // tabla padre
-                    rd.GetString(2),             // tabla hija
-                    rd.GetString(3),             // cols padre csv
-                    rd.GetString(4),             // cols hija csv
-                    rd.GetInt32(5) == 1,         // hija es única
-                    rd.GetInt32(6) == 1));       // ***YA CORRECTO*** todas NOT NULL
-            }
-        }
 
-        // =========================
-        // 4) Tablas de unión M:N (heurística)
-        //    - PK de 2 columnas, al menos 2 FKs, y referencia exactamente a 2 tablas distintas.
-        // =========================
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = @"
+    private const string SqlTablasUnion = @"
 WITH pkcols AS (
   SELECT t.object_id, t.name AS Tabla, kc.name AS PKName, COUNT(*) AS PKCols
   FROM sys.key_constraints kc
@@ -254,17 +185,8 @@ SELECT p.Tabla
 FROM pkcols p
 JOIN fkcount f ON f.object_id = p.object_id
 WHERE p.PKCols = 2 AND f.FKs >= 2 AND f.TablasReferenciadas = 2;";
-            using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-                s.TablasUnionMuchosAMuchos.Add(rd.GetString(0));
-        }
 
-        // =========================
-        // 5) Entidades débiles (PK incluye FK)
-        // =========================
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = @"
+    private const string SqlEntidadesDebiles = @"
 SELECT t.name AS TablaDebil
 FROM sys.tables t
 JOIN sys.key_constraints pk ON pk.parent_object_id = t.object_id AND pk.[type] = 'PK'
@@ -278,11 +200,91 @@ WHERE EXISTS (
   WHERE fkc.parent_object_id = t.object_id
     AND ic.column_id         = fkc.parent_column_id
 );";
-            using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-                s.EntidadesDebiles.Add(rd.GetString(0));
-        }
+
+    /// <summary>
+    /// Lee el esquema (tablas, columnas, FKs, heurísticas) de la base indicada.
+    /// </summary>
+    /// <param name="nombreBD">Nombre de la base restaurada.</param>
+    /// <returns>Instantánea del esquema para diagrama ER/EER.</returns>
+    public async Task<InstantaneaEsquema> LeerAsync(string nombreBD)
+    {
+        var s = new InstantaneaEsquema();
+        using var cn = new SqlConnection(CnnDeBD(_cnnMaestra, nombreBD));
+        await cn.OpenAsync();
+
+        await LeerTablasAsync(cn, s, nombreBD);
+        await LeerColumnasAsync(cn, s);
+        await LeerLlavesForaneasAsync(cn, s);
+        await DetectarTablasUnionAsync(cn, s);
+        await DetectarEntidadesDebilesAsync(cn, s);
 
         return s;
+    }
+
+    private async Task LeerTablasAsync(SqlConnection cn, InstantaneaEsquema s, string nombreBD)
+    {
+        _logger.LogInformation("Leyendo tablas de {Base}", nombreBD);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT name FROM sys.tables WHERE is_ms_shipped = 0 ORDER BY name;";
+        using var rd = await cmd.ExecuteReaderAsync();
+        while (await rd.ReadAsync())
+            s.Tablas.Add(new InfoTabla(rd.GetString(0)));
+    }
+
+    private async Task LeerColumnasAsync(SqlConnection cn, InstantaneaEsquema s)
+    {
+        _logger.LogInformation("Leyendo columnas");
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = SqlColumnas;
+        using var rd = await cmd.ExecuteReaderAsync();
+        while (await rd.ReadAsync())
+        {
+            s.Columnas.Add(new InfoColumna(
+                rd.GetString(0),
+                rd.GetString(1),
+                rd.GetString(2),
+                rd.GetBoolean(3),
+                rd.GetInt32(4) == 1,
+                rd.GetInt32(5) == 1));
+        }
+    }
+
+    private async Task LeerLlavesForaneasAsync(SqlConnection cn, InstantaneaEsquema s)
+    {
+        _logger.LogInformation("Leyendo llaves foraneas");
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = SqlFks;
+        using var rd = await cmd.ExecuteReaderAsync();
+        while (await rd.ReadAsync())
+        {
+            s.LlavesForaneas.Add(new InfoLlaveForanea(
+                rd.GetString(0),
+                rd.GetString(1),
+                rd.GetString(2),
+                rd.GetString(3),
+                rd.GetString(4),
+                rd.GetInt32(5) == 1,
+                rd.GetInt32(6) == 1));
+        }
+    }
+
+    private async Task DetectarTablasUnionAsync(SqlConnection cn, InstantaneaEsquema s)
+    {
+        _logger.LogInformation("Detectando tablas M:N");
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = SqlTablasUnion;
+        using var rd = await cmd.ExecuteReaderAsync();
+        while (await rd.ReadAsync())
+            s.TablasUnionMuchosAMuchos.Add(rd.GetString(0));
+    }
+
+    private async Task DetectarEntidadesDebilesAsync(SqlConnection cn, InstantaneaEsquema s)
+    {
+        _logger.LogInformation("Detectando entidades débiles");
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = SqlEntidadesDebiles;
+        using var rd = await cmd.ExecuteReaderAsync();
+        while (await rd.ReadAsync())
+            s.EntidadesDebiles.Add(rd.GetString(0));
     }
 }
