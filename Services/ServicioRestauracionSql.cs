@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using System.Data;
 
 /// <summary>
@@ -9,13 +10,15 @@ using System.Data;
 public class ServicioRestauracionSql
 {
     private readonly string _cnnMaestra;
+    private readonly ILogger<ServicioRestauracionSql> _logger;
 
     /// <summary>
     /// Crea el servicio leyendo la cadena de conexión "SqlMaestra" (appsettings.json / secretos).
     /// </summary>
-    public ServicioRestauracionSql(IConfiguration cfg)
+    public ServicioRestauracionSql(IConfiguration cfg, ILogger<ServicioRestauracionSql> logger)
     {
         _cnnMaestra = cfg.GetConnectionString("SqlMaestra")!;
+        _logger = logger;
     }
 
     /// <summary>
@@ -30,73 +33,84 @@ public class ServicioRestauracionSql
     /// <exception cref="Exception">Si el .bak no contiene archivos o es incompatible.</exception>
     public async Task<string> RestaurarAsync(string rutaBak, string prefijoNombre = "ER")
     {
-        // Genera un nombre único y “amigable” (sin guiones, mayúsculas).
-        var nombreBD = $"{prefijoNombre}_{Guid.NewGuid():N}".ToUpper();
-
+        var nombreBD = GenerarNombre(prefijoNombre);
         using var cn = new SqlConnection(_cnnMaestra);
         await cn.OpenAsync();
 
-        // 1) Obtener rutas por defecto (data y log) del instance
-        string rutaDatos, rutaLog;
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = @"
+        var (rutaDatos, rutaLog) = await ObtenerRutasPorDefectoAsync(cn);
+        var archivos = await LeerArchivosLogicosAsync(cn, rutaBak);
+        var (logicoDatos, logicoLog) = SeleccionarArchivosLogicos(archivos);
+        var (fisicoDatos, fisicoLog) = ConstruirRutasFisicas(rutaDatos, rutaLog, nombreBD);
+        await RestaurarBaseAsync(cn, rutaBak, nombreBD, logicoDatos, logicoLog, fisicoDatos, fisicoLog);
+
+        return nombreBD;
+    }
+
+    private string GenerarNombre(string prefijo) => $"{prefijo}_{Guid.NewGuid():N}".ToUpper();
+
+    private static async Task<(string datos, string log)> ObtenerRutasPorDefectoAsync(SqlConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = @"
 SELECT CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000)),
        CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(4000));";
-            using var rd = await cmd.ExecuteReaderAsync();
-            rd.Read(); // serverproperty devuelve una fila
-            rutaDatos = rd.GetString(0);
-            rutaLog = rd.GetString(1);
-        }
+        using var rd = await cmd.ExecuteReaderAsync();
+        rd.Read();
+        return (rd.GetString(0), rd.GetString(1));
+    }
 
-        // 2) Leer nombres lógicos de los archivos dentro del .bak
+    private static async Task<List<(string Logico, string Tipo)>> LeerArchivosLogicosAsync(SqlConnection cn, string rutaBak)
+    {
         var archivos = new List<(string Logico, string Tipo)>();
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "RESTORE FILELISTONLY FROM DISK = @p";
-            cmd.Parameters.Add(new SqlParameter("@p", SqlDbType.NVarChar, 4000) { Value = rutaBak });
-            using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-            {
-                // Type: 'D' = data, 'L' = log (puede haber múltiples).
-                archivos.Add((rd["LogicalName"].ToString()!, rd["Type"].ToString()!));
-            }
-        }
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "RESTORE FILELISTONLY FROM DISK = @p";
+        cmd.Parameters.Add(new SqlParameter("@p", SqlDbType.NVarChar, 4000) { Value = rutaBak });
+        using var rd = await cmd.ExecuteReaderAsync();
+        while (await rd.ReadAsync())
+            archivos.Add((rd["LogicalName"].ToString()!, rd["Type"].ToString()!));
         if (archivos.Count == 0)
             throw new Exception("El archivo .bak no contiene archivos o es incompatible.");
+        return archivos;
+    }
 
-        // Seleccionar un archivo lógico de datos y uno de log (asumiendo estructura típica 1D/1L)
+    private static (string datos, string log) SeleccionarArchivosLogicos(List<(string Logico, string Tipo)> archivos)
+    {
         var logicoDatos = archivos.First(a => a.Tipo == "D").Logico;
         var logicoLog = archivos.First(a => a.Tipo == "L").Logico;
+        return (logicoDatos, logicoLog);
+    }
 
-        // 3) Construir rutas físicas destino (.mdf/.ldf) en las carpetas por defecto del instance
+    private static (string datos, string log) ConstruirRutasFisicas(string rutaDatos, string rutaLog, string nombreBD)
+    {
         var fisicoDatos = Path.Combine(rutaDatos, $"{nombreBD}.mdf");
         var fisicoLog = Path.Combine(rutaLog, $"{nombreBD}_log.ldf");
+        return (fisicoDatos, fisicoLog);
+    }
 
-        // 4) Restaurar la base con MOVE + REPLACE + RECOVERY
-        using (var cmd = cn.CreateCommand())
-        {
-            // Para restores grandes, sin límite de tiempo
-            cmd.CommandTimeout = 0;
-
-            // Nota: Se parametriza el DISK y los nombres lógicos/físicos.
-            // Los identificadores (nombre de BD) se insertan en el T-SQL (no parametrizable como identificador),
-            // pero el nombre lo generamos nosotros, no proviene del usuario.
-            cmd.CommandText = @"
+    private async Task RestaurarBaseAsync(
+        SqlConnection cn,
+        string rutaBak,
+        string nombreBD,
+        string logicoDatos,
+        string logicoLog,
+        string fisicoDatos,
+        string fisicoLog)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandTimeout = 0;
+        cmd.CommandText = @"
 RESTORE DATABASE [" + nombreBD + @"] FROM DISK = @p
 WITH MOVE @ld TO @d,
      MOVE @ll TO @l,
      REPLACE, RECOVERY, STATS = 5;";
-            cmd.Parameters.AddWithValue("@p", rutaBak);
-            cmd.Parameters.AddWithValue("@ld", logicoDatos);
-            cmd.Parameters.AddWithValue("@ll", logicoLog);
-            cmd.Parameters.AddWithValue("@d", fisicoDatos);
-            cmd.Parameters.AddWithValue("@l", fisicoLog);
+        cmd.Parameters.AddWithValue("@p", rutaBak);
+        cmd.Parameters.AddWithValue("@ld", logicoDatos);
+        cmd.Parameters.AddWithValue("@ll", logicoLog);
+        cmd.Parameters.AddWithValue("@d", fisicoDatos);
+        cmd.Parameters.AddWithValue("@l", fisicoLog);
 
-            await cmd.ExecuteNonQueryAsync();
-        }
-
-        return nombreBD;
+        _logger.LogInformation("Restaurando base de datos {Nombre}", nombreBD);
+        await cmd.ExecuteNonQueryAsync();
     }
 
     /// <summary>
@@ -120,6 +134,7 @@ BEGIN
 END";
         cmd.Parameters.AddWithValue("@db", nombreBD);
 
+        _logger.LogInformation("Eliminando base de datos {Nombre}", nombreBD);
         await cmd.ExecuteNonQueryAsync();
     }
 }

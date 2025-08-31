@@ -1,19 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 #region Modelos EER
-
-/// <summary>Estado de disyunción en la jerarquía EER.</summary>
 public enum EerDisjointness { Exclusive, Overlapping, Ambiguous }
-/// <summary>Estado de totalidad en la jerarquía EER.</summary>
 public enum EerTotalness { Total, Partial, Ambiguous }
 
-/// <summary>
-/// Jerarquía de especialización (EER) detectada:
-/// Supertipo, lista de Subtipos y heurísticas de Disyunción/Totalidad.
-/// </summary>
 public class JerarquiaEer
 {
     public string Supertipo { get; init; } = "";
@@ -22,92 +14,107 @@ public class JerarquiaEer
     public EerTotalness Totalidad { get; set; } = EerTotalness.Ambiguous;
     public string? Evidencia { get; set; }
 }
-
 #endregion
 
-/// <summary>
-/// Motor de inferencia EER: detecta jerarquías por patrón PK=FK (FK UNIQUE) y
-/// renderiza un diagrama Mermaid con etiqueta de “especialización”.
-/// </summary>
 public static class InferenciaEER
 {
-    /// <summary>
-    /// Detecta jerarquías de especialización (subtipos) por el patrón PK=FK:
-    /// la FK en la hija es única y coincide (en orden) con la PK de la hija.
-    /// </summary>
-    /// <param name="s">Instantánea del esquema con tablas, columnas y FKs agrupadas.</param>
-    /// <returns>Lista de <see cref="JerarquiaEer"/> detectadas.</returns>
     public static List<JerarquiaEer> DetectarJerarquias(InstantaneaEsquema s)
     {
-        // PK por tabla (para comparar con columnas de las FK en hija)
-        var pkPorTabla = s.Tablas.ToDictionary(
-            t => t.Nombre,
-            t => s.Columnas.Where(c => c.Tabla == t.Nombre && c.EsPk).Select(c => c.Nombre).ToList(),
-            StringComparer.OrdinalIgnoreCase);
-
-        // Candidatos a subtipo: FK única en hija y columnas FK == PK(hija)
-        var candidatos = s.LlavesForaneas.Where(fk =>
-        {
-            if (!fk.HijaEsUnica) return false;
-            if (!pkPorTabla.TryGetValue(fk.TablaHija, out var pkCols) || pkCols.Count == 0) return false;
-
-            var fkCols = fk.ColumnasHijaCsv.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            return pkCols.SequenceEqual(fkCols, StringComparer.OrdinalIgnoreCase);
-        }).ToList();
-
-        // Agrupar por padre → Supertipo; hijas → Subtipos
-        var grupos = candidatos.GroupBy(x => x.TablaPadre, StringComparer.OrdinalIgnoreCase);
-        var lista = new List<JerarquiaEer>();
-
-        foreach (var g in grupos)
-        {
-            var j = new JerarquiaEer { Supertipo = g.Key };
-            foreach (var fk in g) j.Subtipos.Add(fk.TablaHija);
-
-            // Heurística: discriminador NOT NULL en el supertipo → Disyunción exclusiva.
-            var disc = s.Columnas.FirstOrDefault(c =>
-                c.Tabla.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
-                (c.Nombre.Equals("Tipo", StringComparison.OrdinalIgnoreCase) ||
-                 c.Nombre.Equals("Discriminator", StringComparison.OrdinalIgnoreCase) ||
-                 c.Nombre.Equals("Categoria", StringComparison.OrdinalIgnoreCase) ||
-                 c.Nombre.Equals("Clase", StringComparison.OrdinalIgnoreCase) ||
-                 c.Nombre.Equals("Subtipo", StringComparison.OrdinalIgnoreCase)));
-
-            if (disc is not null && !disc.EsNulo)
-            {
-                j.Disyuncion = EerDisjointness.Exclusive;
-                j.Totalidad = EerTotalness.Ambiguous;
-                j.Evidencia = $"Discriminador {disc.Nombre} en {j.Supertipo} (NOT NULL).";
-            }
-            else
-            {
-                j.Disyuncion = j.Subtipos.Count > 1 ? EerDisjointness.Overlapping : EerDisjointness.Ambiguous;
-                j.Totalidad = EerTotalness.Ambiguous;
-                j.Evidencia = "Subtipos detectados por patrón PK=FK (FK UNIQUE).";
-            }
-
-            lista.Add(j);
-        }
-
-        return lista;
+        var pkPorTabla = ConstruirPkPorTabla(s);
+        var candidatos = BuscarCandidatos(s, pkPorTabla);
+        return AgruparJerarquias(candidatos, s);
     }
 
-    /// <summary>
-    /// Renderiza Mermaid (flowchart TB) para jerarquías EER con nodo “especialización”.
-    /// </summary>
+    private static Dictionary<string, List<string>> ConstruirPkPorTabla(InstantaneaEsquema s)
+    {
+        var dict = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in s.Tablas)
+        {
+            var cols = new List<string>();
+            foreach (var c in s.Columnas)
+                if (c.Tabla == t.Nombre && c.EsPk)
+                    cols.Add(c.Nombre);
+            dict[t.Nombre] = cols;
+        }
+        return dict;
+    }
+
+    private static List<InfoLlaveForanea> BuscarCandidatos(InstantaneaEsquema s, Dictionary<string, List<string>> pkPorTabla)
+    {
+        var list = new List<InfoLlaveForanea>();
+        foreach (var fk in s.LlavesForaneas)
+        {
+            if (!fk.HijaEsUnica) continue;
+            if (!pkPorTabla.TryGetValue(fk.TablaHija, out var pkCols) || pkCols.Count == 0) continue;
+            var fkCols = fk.ColumnasHijaCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (pkCols.Count != fkCols.Length) continue;
+            bool igual = true;
+            for (int i = 0; i < pkCols.Count; i++)
+                if (!pkCols[i].Equals(fkCols[i], StringComparison.OrdinalIgnoreCase))
+                { igual = false; break; }
+            if (igual) list.Add(fk);
+        }
+        return list;
+    }
+
+    private static List<JerarquiaEer> AgruparJerarquias(List<InfoLlaveForanea> candidatos, InstantaneaEsquema s)
+    {
+        var porPadre = new Dictionary<string, List<InfoLlaveForanea>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var fk in candidatos)
+        {
+            if (!porPadre.TryGetValue(fk.TablaPadre, out var list))
+            {
+                list = new List<InfoLlaveForanea>();
+                porPadre[fk.TablaPadre] = list;
+            }
+            list.Add(fk);
+        }
+
+        var resultado = new List<JerarquiaEer>();
+        foreach (var kv in porPadre)
+            resultado.Add(CrearJerarquia(kv.Key, kv.Value, s));
+        return resultado;
+    }
+
+    private static JerarquiaEer CrearJerarquia(string padre, List<InfoLlaveForanea> fks, InstantaneaEsquema s)
+    {
+        var j = new JerarquiaEer { Supertipo = padre };
+        foreach (var fk in fks) j.Subtipos.Add(fk.TablaHija);
+
+        var disc = BuscarDiscriminador(padre, s);
+        if (disc is not null && !disc.EsNulo)
+        {
+            j.Disyuncion = EerDisjointness.Exclusive;
+            j.Evidencia = $"Discriminador {disc.Nombre} en {padre} (NOT NULL).";
+        }
+        else
+        {
+            j.Disyuncion = j.Subtipos.Count > 1 ? EerDisjointness.Overlapping : EerDisjointness.Ambiguous;
+            j.Evidencia = "Subtipos detectados por patrón PK=FK (FK UNIQUE).";
+        }
+
+        j.Totalidad = EerTotalness.Ambiguous;
+        return j;
+    }
+
+    private static InfoColumna? BuscarDiscriminador(string sup, InstantaneaEsquema s)
+    {
+        foreach (var c in s.Columnas)
+        {
+            if (!c.Tabla.Equals(sup, StringComparison.OrdinalIgnoreCase)) continue;
+            var n = c.Nombre;
+            if (n.Equals("Tipo", StringComparison.OrdinalIgnoreCase) ||
+                n.Equals("Discriminator", StringComparison.OrdinalIgnoreCase) ||
+                n.Equals("Categoria", StringComparison.OrdinalIgnoreCase) ||
+                n.Equals("Clase", StringComparison.OrdinalIgnoreCase) ||
+                n.Equals("Subtipo", StringComparison.OrdinalIgnoreCase))
+                return c;
+        }
+        return null;
+    }
+
     public static string RenderMermaidEER(IReadOnlyList<JerarquiaEer> hs)
     {
-        // Sanear IDs Mermaid
-        string San(string s)
-        {
-            var x = new string(s.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray());
-            if (x.Length == 0 || !char.IsLetter(x[0])) x = "N_" + x;
-            return x.Length > 60 ? x[..60] : x;
-        }
-        // Escapar texto para Mermaid
-        string Esc(string? s) =>
-            (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " ");
-
         var sb = new StringBuilder();
         sb.AppendLine("flowchart TB");
         sb.AppendLine("classDef super fill:#e8f4ff,stroke:#2a6fb3,stroke-width:1px,rx:8,ry:8;");
@@ -116,41 +123,59 @@ public static class InferenciaEER
 
         int k = 0;
         foreach (var h in hs)
-        {
-            var tagDis = h.Disyuncion switch
-            {
-                EerDisjointness.Exclusive => "exclusive",
-                EerDisjointness.Overlapping => "overlapping",
-                _ => "ambiguous"
-            };
-            var tagTot = h.Totalidad switch
-            {
-                EerTotalness.Total => "total",
-                EerTotalness.Partial => "partial",
-                _ => "ambiguous"
-            };
-
-            var supId = San(h.Supertipo);
-            sb.AppendLine($"{supId}[\"{Esc(h.Supertipo)} ({tagDis},{tagTot})\"]:::super");
-
-            var genId = $"GEN_{k++}_{supId}";
-            sb.AppendLine($"{genId}[[especializacion]]:::note");
-            sb.AppendLine($"{genId} --> {supId}");
-
-            foreach (var sub in h.Subtipos.Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                var subId = San(sub);
-                sb.AppendLine($"{subId}(\"{Esc(sub)}\"):::sub");
-                sb.AppendLine($"{subId} -->|is a| {genId}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(h.Evidencia))
-            {
-                var noteId = $"NOTE_{supId}";
-                sb.AppendLine($"{noteId}[\"{Esc(h.Evidencia)}\"]:::note");
-                sb.AppendLine($"{noteId} -.-> {supId}");
-            }
-        }
+            RenderJerarquia(sb, h, ref k);
         return sb.ToString();
+    }
+
+    private static string SanId(string s)
+    {
+        var sb = new StringBuilder();
+        foreach (var ch in s)
+            sb.Append(char.IsLetterOrDigit(ch) ? ch : '_');
+        if (sb.Length == 0 || !char.IsLetter(sb[0])) sb.Insert(0, "N_");
+        var r = sb.ToString();
+        return r.Length > 60 ? r[..60] : r;
+    }
+
+    private static string EscTxt(string? s) =>
+        (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " ");
+
+    private static void RenderJerarquia(StringBuilder sb, JerarquiaEer h, ref int k)
+    {
+        var tagDis = h.Disyuncion switch
+        {
+            EerDisjointness.Exclusive => "exclusive",
+            EerDisjointness.Overlapping => "overlapping",
+            _ => "ambiguous",
+        };
+        var tagTot = h.Totalidad switch
+        {
+            EerTotalness.Total => "total",
+            EerTotalness.Partial => "partial",
+            _ => "ambiguous",
+        };
+
+        var supId = SanId(h.Supertipo);
+        sb.AppendLine($"{supId}[\"{EscTxt(h.Supertipo)} ({tagDis},{tagTot})\"]:::super");
+
+        var genId = $"GEN_{k++}_{supId}";
+        sb.AppendLine($"{genId}[[especializacion]]:::note");
+        sb.AppendLine($"{genId} --> {supId}");
+
+        var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var sub in h.Subtipos)
+        {
+            if (!vistos.Add(sub)) continue;
+            var subId = SanId(sub);
+            sb.AppendLine($"{subId}(\"{EscTxt(sub)}\"):::sub");
+            sb.AppendLine($"{subId} -->|is a| {genId}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(h.Evidencia))
+        {
+            var noteId = $"NOTE_{supId}";
+            sb.AppendLine($"{noteId}[\"{EscTxt(h.Evidencia)}\"]:::note");
+            sb.AppendLine($"{noteId} -.-> {supId}");
+        }
     }
 }
