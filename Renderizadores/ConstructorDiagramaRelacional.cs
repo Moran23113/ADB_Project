@@ -1,39 +1,16 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using ABD_Project.Modelos;
+using ABD_Project.Utilidades;
 
 /// <summary>
 /// Renderizador que genera un diagrama relacional (erDiagram) en Mermaid.
 /// Marca claves primarias y foráneas y oculta tablas internas.
 /// </summary>
-public class RenderizadorRelacional
+public class ConstructorDiagramaRelacional
 {
-    private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
-
-    private static string San(string? id)
-    {
-        var s = id ?? "X";
-        s = _idBad.Replace(s, "_");
-        if (string.IsNullOrEmpty(s) || !char.IsLetter(s[0])) s = "N_" + s;
-        if (s.Length > 60) s = s[..60];
-        return s;
-    }
-
-    // Escapar caracteres que rompen erDiagram, incluidas comillas
-    private static string Esc(string? txt)
-    {
-        if (string.IsNullOrEmpty(txt)) return "";
-        return txt.Replace("\r", " ")
-                  .Replace("\n", " ")
-                  .Replace("\"", "&quot;")
-                  .Replace("<", "&lt;")
-                  .Replace(">", "&gt;")
-                  .Replace("{", "\\{").Replace("}", "\\}")
-                  .Replace("[", "&#91;").Replace("]", "&#93;");
-    }
 
     private static string MapTipo(string t) => t switch
     {
@@ -46,7 +23,7 @@ public class RenderizadorRelacional
         "decimal" or "numeric" => "decimal",
         "float" => "float",
         "varchar" or "nvarchar" => "varchar",
-        _ => _idBad.Replace(t, "_") // simplifica tipos raros para Mermaid
+        _ => TextoMermaid.San(t) // simplifica tipos raros para Mermaid
     };
 
     /// Genera Mermaid erDiagram (crow’s foot) a partir de InstantaneaEsquema.
@@ -79,7 +56,7 @@ public class RenderizadorRelacional
             fksPorTabla.TryGetValue(t, out var fkCols);
             fkCols ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            sb.AppendLine($"  {San(t)} {{");
+            sb.AppendLine($"  {TextoMermaid.San(t)} {{");
             foreach (var c in s.Columnas.Where(c => c.Tabla == t))
             {
                 var tipo = MapTipo(c.Tipo);
@@ -91,7 +68,7 @@ public class RenderizadorRelacional
                 if (c.EsUnicoCandidato && !c.EsPk) flags.Add("UK"); // si ya es PK, no repito UK
 
                 var flagTxt = flags.Count > 0 ? " " + string.Join(" ", flags) : "";
-                sb.AppendLine($"    {Esc(tipo)} {Esc(c.Nombre)}{flagTxt}");
+                sb.AppendLine($"    {TextoMermaid.Esc(tipo)} {TextoMermaid.Esc(c.Nombre)}{flagTxt}");
             }
             sb.AppendLine("  }");
         }
@@ -106,8 +83,8 @@ public class RenderizadorRelacional
                 ? (fk.HijaTodasNoNulas ? "||" : "o|")   // 1:1 o 0..1
                 : (fk.HijaTodasNoNulas ? "|{" : "o{");  // 1:N o 0..N
 
-            var etiqueta = Esc(fk.Nombre);
-            sb.AppendLine($"  {San(fk.TablaPadre)} {left}--{right} {San(fk.TablaHija)} : \"{etiqueta}\"");
+            var etiqueta = TextoMermaid.Esc(fk.Nombre);
+            sb.AppendLine($"  {TextoMermaid.San(fk.TablaPadre)} {left}--{right} {TextoMermaid.San(fk.TablaHija)} : \"{etiqueta}\"");
         }
 
         return sb.ToString();

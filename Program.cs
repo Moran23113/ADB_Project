@@ -4,8 +4,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<ServicioRestauracionSql>();
 builder.Services.AddSingleton<LectorEsquemaSql>();
-builder.Services.AddSingleton<RenderizadorChen>();
-builder.Services.AddSingleton<RenderizadorRelacional>();
+builder.Services.AddSingleton<ConstructorDiagramaChen>();
+builder.Services.AddSingleton<ConstructorDiagramaRelacional>();
+builder.Services.AddSingleton<EERChoicesService>();
 
 
 var app = builder.Build();

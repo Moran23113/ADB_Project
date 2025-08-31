@@ -3,11 +3,11 @@
 public class RelacionalController : Controller
 {
     private readonly LectorEsquemaSql _lector;
-    private readonly RenderizadorRelacional _renderizador;
+    private readonly ConstructorDiagramaRelacional _renderizador;
 
     public RelacionalController(
         LectorEsquemaSql lector,
-        RenderizadorRelacional renderizador)
+        ConstructorDiagramaRelacional renderizador)
     {
         _lector = lector;
         _renderizador = renderizador;
@@ -18,7 +18,7 @@ public class RelacionalController : Controller
     /// /Relacional?nombreBD=ER_XXXXXXXX
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> ModeloR(string nombreBD)
+    public async Task<IActionResult> Index(string nombreBD)
     {
         if (string.IsNullOrWhiteSpace(nombreBD))
         {

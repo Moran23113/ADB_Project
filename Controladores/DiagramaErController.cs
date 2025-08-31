@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using System.Linq;
 using ABD_Project.Modelos;
 
@@ -22,10 +21,10 @@ using ABD_Project.Modelos;
 /// Dependencias inyectadas:
 /// - <see cref="ServicioRestauracionSql"/>: Restaura/Elimina bases desde .bak.
 /// - <see cref="LectorEsquemaSql"/>: Lee el esquema (tablas, columnas, FKs, pks).
-/// - <see cref="RenderizadorChen"/>: Genera Mermaid para ER (Chen).
+/// - <see cref="ConstructorDiagramaChen"/>: Genera Mermaid para ER (Chen).
 /// 
 /// Notas:
-/// - Las elecciones EER se guardan en la BD restaurada (tabla interna controlada por PersistenciaEleccionesEer).
+/// - Las elecciones EER se guardan en la BD restaurada (tabla interna controlada por EERChoicesService).
 /// - El límite de carga está configurado en 1GB en este controlador (RequestSizeLimit).
 /// </remarks>
 public class DiagramaErController : Controller
@@ -34,7 +33,8 @@ public class DiagramaErController : Controller
     private readonly IConfiguration _cfg;
     private readonly ServicioRestauracionSql _restaurador;
     private readonly LectorEsquemaSql _lector;
-    private readonly RenderizadorChen _renderizador;
+    private readonly ConstructorDiagramaChen _renderizador;
+    private readonly EERChoicesService _choices;
 
 
     /// <summary>
@@ -45,13 +45,15 @@ public class DiagramaErController : Controller
         IConfiguration cfg,
         ServicioRestauracionSql restaurador,
         LectorEsquemaSql lector,
-        RenderizadorChen renderizador)
+        ConstructorDiagramaChen renderizador,
+        EERChoicesService choices)
     {
         _entorno = entorno;
         _cfg = cfg;
         _restaurador = restaurador;
         _lector = lector;
         _renderizador = renderizador;
+        _choices = choices;
     }
 
     /// <summary>
@@ -100,7 +102,7 @@ public class DiagramaErController : Controller
 
             // 2.b) Construir cadena de conexión hacia la BD restaurada.
             //     (Se usa para leer/guardar elecciones EER en esa misma BD).
-            var cnnRestaurada = PersistenciaEleccionesEer.ConstruirConexionBdRestaurada(_cfg, nombreBD);
+            var cnnRestaurada = _choices.ConstruirConexionBdRestaurada(nombreBD);
 
             // 3) ER (Chen): generar Mermaid del modelo relacional.
             ViewBag.NombreBD = nombreBD;
@@ -110,9 +112,7 @@ public class DiagramaErController : Controller
             var jerarquias = InferenciaEer.DetectarJerarquias(snap);
 
             // 4.b) Aplicar elecciones guardadas previamente (si existen) desde la BD restaurada.
-            await AplicadorEleccionesEer.AplicarEleccionesAsync(
-                () => PersistenciaEleccionesEer.CargarEleccionesAsync(cnnRestaurada),
-                jerarquias);
+            await _choices.AplicarEleccionesAsync(cnnRestaurada, jerarquias);
 
             // 4.c) Render EER en Mermaid (con etiqueta "especializacion").
             ViewBag.MermaidEER = InferenciaEer.RenderizarMermaidEer(jerarquias);
@@ -175,8 +175,8 @@ public class DiagramaErController : Controller
         try
         {
             // 1) Guardar elecciones en la BD restaurada (tabla interna de choices).
-            var cnnRestaurada = PersistenciaEleccionesEer.ConstruirConexionBdRestaurada(_cfg, NombreBD);
-            await PersistenciaEleccionesEer.GuardarEleccionesAsync(cnnRestaurada, Disyuncion, Totalidad, SubtypesCsv);
+            var cnnRestaurada = _choices.ConstruirConexionBdRestaurada(NombreBD);
+            await _choices.GuardarEleccionesAsync(cnnRestaurada, Disyuncion, Totalidad, SubtypesCsv);
 
             // 2) Releer esquema y reconstruir diagramas (ER + EER) tras aplicar elecciones.
             var snap = await _lector.LeerAsync(NombreBD);
@@ -186,9 +186,7 @@ public class DiagramaErController : Controller
 
             var jerarquias = InferenciaEer.DetectarJerarquias(snap);
 
-            await AplicadorEleccionesEer.AplicarEleccionesAsync(
-                () => PersistenciaEleccionesEer.CargarEleccionesAsync(cnnRestaurada),
-                jerarquias);
+            await _choices.AplicarEleccionesAsync(cnnRestaurada, jerarquias);
 
             ViewBag.MermaidEER = InferenciaEer.RenderizarMermaidEer(jerarquias);
 
