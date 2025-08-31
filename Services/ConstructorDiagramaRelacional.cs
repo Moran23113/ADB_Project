@@ -4,6 +4,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 
+/// <summary>
+/// Genera diagramas <c>erDiagram</c> de Mermaid usando notación crow's foot
+/// (relacional) a partir de una <see cref="InstantaneaEsquema"/> con tablas,
+/// columnas y llaves foráneas.
+/// </summary>
 public class ConstructorDiagramaRelacional
 {
     private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
@@ -47,6 +52,8 @@ public class ConstructorDiagramaRelacional
     /// Genera Mermaid erDiagram (crow’s foot) a partir de InstantaneaEsquema.
     public string Construir(InstantaneaEsquema s)
     {
+        // Tablas internas que no deben verse en el diagrama
+        // (por ejemplo EER_UserChoices usada para opciones de usuario).
         var ocultas = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EER_UserChoices" };
         var sb = new StringBuilder();
         sb.AppendLine("erDiagram");
@@ -96,7 +103,12 @@ public class ConstructorDiagramaRelacional
         {
             if (ocultas.Contains(fk.TablaPadre) || ocultas.Contains(fk.TablaHija)) continue;
 
-            var left = "||"; // padre: exactamente 1
+            var left = "||"; // Padre: exactamente 1
+            // Reglas de Mermaid erDiagram:
+            //   || : lado justo 1
+            //   o| : 0 o 1
+            //   |{ : 1 o muchos
+            //   o{ : 0 o muchos
             string right = fk.HijaEsUnica
                 ? (fk.HijaTodasNoNulas ? "||" : "o|")   // 1:1 o 0..1
                 : (fk.HijaTodasNoNulas ? "|{" : "o{");  // 1:N o 0..N

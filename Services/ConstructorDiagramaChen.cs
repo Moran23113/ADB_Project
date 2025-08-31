@@ -57,7 +57,8 @@ public class ConstructorDiagramaChen
     {
         var sb = new StringBuilder();
 
-        // Tablas internas que no deben dibujarse
+        // Tablas internas que no deben dibujarse en ningún diagrama
+        // (p.ej. EER_UserChoices con elecciones de usuario).
         var ocultas = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "EER_UserChoices"
@@ -103,6 +104,11 @@ public class ConstructorDiagramaChen
             sb.AppendLine($"  {relId}{{{{{Esc(fk.Nombre)}}}}}:::relacion");
             sb.AppendLine($"  {San(fk.TablaPadre)} -- \"1\" --> {relId}");
 
+            // Reglas de cardinalidad Chen basadas en la FK:
+            //   HijaEsUnica && HijaTodasNoNulas -> "1"
+            //   HijaEsUnica && !HijaTodasNoNulas -> "0..1"
+            //   !HijaEsUnica && HijaTodasNoNulas -> "1..N"
+            //   !HijaEsUnica && !HijaTodasNoNulas -> "0..N"
             string mult = fk.HijaEsUnica
                 ? (fk.HijaTodasNoNulas ? "1" : "0..1")
                 : (fk.HijaTodasNoNulas ? "1..N" : "0..N");

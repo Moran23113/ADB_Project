@@ -115,6 +115,7 @@ public class LectorEsquemaSql
         {
             cmd.CommandText = @"
 WITH pkcols AS (
+  -- Columnas que conforman la clave primaria
   SELECT ic.object_id, ic.column_id
   FROM sys.key_constraints pk
   JOIN sys.index_columns ic
@@ -123,6 +124,7 @@ WITH pkcols AS (
   WHERE pk.[type] = 'PK'
 ),
 uqcols AS (
+  -- Columnas que participan en algún índice único (no PK)
   SELECT ic.object_id, ic.column_id
   FROM sys.indexes i
   JOIN sys.index_columns ic
@@ -162,6 +164,7 @@ ORDER BY t.name, c.column_id;";
         {
             cmd.CommandText = @"
 WITH fkcols AS (
+  -- Desglosa cada FK en sus columnas padre/hija
   SELECT fk.object_id AS fk_id, fk.name AS FK_Nombre,
          rt.name AS TablaPadre, t.name AS TablaHija,
          pc.name AS ColPadre, cc.name AS ColHija, cc.column_id
@@ -173,6 +176,7 @@ WITH fkcols AS (
   JOIN sys.columns cc ON cc.object_id = fkc.parent_object_id     AND cc.column_id = fkc.parent_column_id
 ),
 fkg AS (
+  -- Agrupa columnas por FK manteniendo el orden original
   SELECT fk_id,
          MAX(FK_Nombre)   AS FK_Nombre,
          MAX(TablaPadre)  AS TablaPadre,
@@ -183,7 +187,8 @@ fkg AS (
   GROUP BY fk_id
 ),
 uniq_hija AS (
-  -- Nota: i.is_unique incluye PKs; si quieres excluir PKs, agrega 'AND i.is_primary_key = 0'
+  -- Conjuntos de columnas hija cubiertos por algún índice único
+  -- Nota: i.is_unique incluye PKs; para excluirlas: 'AND i.is_primary_key = 0'
   SELECT t.name AS Tabla,
          STRING_AGG(c.name, ', ') WITHIN GROUP (ORDER BY ic.key_ordinal) AS Cols
   FROM sys.indexes i
@@ -194,8 +199,7 @@ uniq_hija AS (
   GROUP BY t.name
 ),
 fk_nullable AS (
-  -- ***FIX***: queremos 1 sólo si TODAS las columnas FK son NOT NULL.
-  -- Si alguna columna de la FK es nullable -> 0.
+  -- 1 solo si todas las columnas FK son NOT NULL (participación total)
   SELECT fkc.constraint_object_id AS fk_id,
          MIN(CASE WHEN c.is_nullable = 0 THEN 1 ELSE 0 END) AS AllNotNull
   FROM sys.foreign_key_columns fkc
@@ -235,6 +239,7 @@ ORDER BY g.TablaPadre, g.TablaHija;";
         {
             cmd.CommandText = @"
 WITH pkcols AS (
+  -- Cuenta columnas de la PK por tabla
   SELECT t.object_id, t.name AS Tabla, kc.name AS PKName, COUNT(*) AS PKCols
   FROM sys.key_constraints kc
   JOIN sys.tables t ON t.object_id = kc.parent_object_id
@@ -242,6 +247,7 @@ WITH pkcols AS (
   GROUP BY t.object_id, t.name, kc.name
 ),
 fkcount AS (
+  -- Número de FKs y tablas referenciadas por cada tabla
   SELECT t.object_id,
          COUNT(DISTINCT fk.object_id) AS FKs,
          COUNT(DISTINCT rt.name)      AS TablasReferenciadas
