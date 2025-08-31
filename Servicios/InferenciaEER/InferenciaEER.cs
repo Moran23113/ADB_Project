@@ -1,7 +1,10 @@
-﻿using System;
+using ABD_Project.Servicios.Modelos;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+
+namespace ABD_Project.Servicios.InferenciaEER;
 
 #region Modelos EER
 

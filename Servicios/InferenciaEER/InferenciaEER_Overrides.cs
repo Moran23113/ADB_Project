@@ -1,7 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+
+namespace ABD_Project.Servicios.InferenciaEER;
 
 /// <summary>
 /// Aplica las elecciones del usuario (persistidas) sobre las jerarquías EER detectadas.

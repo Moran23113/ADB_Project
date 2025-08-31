@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 
 #region Controlador: Diagrama ER / EER
 /// <summary>

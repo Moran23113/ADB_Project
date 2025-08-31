@@ -1,64 +1,9 @@
-﻿// Models (pueden ir arriba del mismo archivo)
+using ABD_Project.Servicios.Modelos;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 
-/// <summary>
-/// Información mínima de una tabla para el diagrama.
-/// </summary>
-/// <param name="Nombre">Nombre lógico de la tabla.</param>
-public record InfoTabla(string Nombre);
-
-/// <summary>
-/// Columna con metadatos relevantes para ER/EER.
-/// </summary>
-/// <param name="Tabla">Nombre de la tabla a la que pertenece.</param>
-/// <param name="Nombre">Nombre de la columna.</param>
-/// <param name="Tipo">Tipo de datos (user type).</param>
-/// <param name="EsNulo">Indica si admite NULL.</param>
-/// <param name="EsPk">Indica si forma parte de la clave primaria.</param>
-/// <param name="EsUnicoCandidato">Indica si participa en alguna restricción/índice único (no PK).</param>
-public record InfoColumna(string Tabla, string Nombre, string Tipo, bool EsNulo, bool EsPk, bool EsUnicoCandidato);
-
-/// <summary>
-/// Llave foránea agrupada (posiblemente multicolumna).
-/// </summary>
-/// <param name="Nombre">Nombre de la FK.</param>
-/// <param name="TablaPadre">Tabla referenciada (lado 1).</param>
-/// <param name="TablaHija">Tabla que contiene la FK (lado N/0..1).</param>
-/// <param name="ColumnasPadreCsv">Columnas PK/UK referenciadas (en orden).</param>
-/// <param name="ColumnasHijaCsv">Columnas FK en la hija (en orden).</param>
-/// <param name="HijaEsUnica">True si el conjunto de columnas hija está cubierto por un índice único.</param>
-/// <param name="HijaTodasNoNulas">True si todas las columnas FK en la hija son NOT NULL.</param>
-public record InfoLlaveForanea(
-    string Nombre, string TablaPadre, string TablaHija,
-    string ColumnasPadreCsv, string ColumnasHijaCsv,
-    bool HijaEsUnica, bool HijaTodasNoNulas);
-
-/// <summary>
-/// Contenedor con toda la instantánea necesaria para construir el diagrama.
-/// </summary>
-public class InstantaneaEsquema
-{
-    /// <summary>Tablas del esquema (excluye del sistema).</summary>
-    public List<InfoTabla> Tablas { get; } = new();
-
-    /// <summary>Todas las columnas con flags de PK/Único/Nulabilidad.</summary>
-    public List<InfoColumna> Columnas { get; } = new();
-
-    /// <summary>Llaves foráneas (agrupadas) con cardinalidad/participación inferida.</summary>
-    public List<InfoLlaveForanea> LlavesForaneas { get; } = new();
-
-    /// <summary>Nombres de tablas puente (M:N) identificadas por heurística.</summary>
-    public HashSet<string> TablasUnionMuchosAMuchos { get; } = new();
-
-    /// <summary>Entidades débiles (PK incluye alguna FK) detectadas por heurística.</summary>
-    public HashSet<string> EntidadesDebiles { get; } = new();
-}
+namespace ABD_Project.Servicios;
 
 /// <summary>
 /// Lector de metadatos desde SQL Server, basado en catálogos del sistema.

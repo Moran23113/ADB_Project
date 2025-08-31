@@ -11,4 +11,12 @@
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="ABD_Project.Servicios" />
+    <Using Include="ABD_Project.Servicios.Renderizadores" />
+    <Using Include="ABD_Project.Servicios.InferenciaEER" />
+    <Using Include="ABD_Project.Servicios.Utilidades" />
+    <Using Include="ABD_Project.Servicios.Modelos" />
+  </ItemGroup>
+
 </Project>

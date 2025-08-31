@@ -1,8 +1,10 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+
+namespace ABD_Project.Servicios.Utilidades;
 
 /// <summary>
 /// Persistencia de elecciones EER (Disyunción / Totalidad) dentro de la BD restaurada.
