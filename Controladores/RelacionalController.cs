@@ -3,14 +3,14 @@
 public class RelacionalController : Controller
 {
     private readonly LectorEsquemaSql _lector;
-    private readonly ConstructorDiagramaRelacional _constructorRel;
+    private readonly RenderizadorRelacional _renderizador;
 
     public RelacionalController(
         LectorEsquemaSql lector,
-        ConstructorDiagramaRelacional constructorRel)
+        RenderizadorRelacional renderizador)
     {
         _lector = lector;
-        _constructorRel = constructorRel;
+        _renderizador = renderizador;
     }
 
     /// <summary>
@@ -30,7 +30,7 @@ public class RelacionalController : Controller
         {
             var snap = await _lector.LeerAsync(nombreBD);
             ViewBag.NombreBD = nombreBD;
-            ViewBag.MermaidRel = _constructorRel.Construir(snap);
+            ViewBag.MermaidRel = _renderizador.Construir(snap);
             return View();
         }
         catch (Exception ex)

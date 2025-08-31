@@ -1,98 +1,42 @@
-﻿// Models (pueden ir arriba del mismo archivo)
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
+using ABD_Project.Modelos;
 
 /// <summary>
-/// Información mínima de una tabla para el diagrama.
-/// </summary>
-/// <param name="Nombre">Nombre lógico de la tabla.</param>
-public record InfoTabla(string Nombre);
-
-/// <summary>
-/// Columna con metadatos relevantes para ER/EER.
-/// </summary>
-/// <param name="Tabla">Nombre de la tabla a la que pertenece.</param>
-/// <param name="Nombre">Nombre de la columna.</param>
-/// <param name="Tipo">Tipo de datos (user type).</param>
-/// <param name="EsNulo">Indica si admite NULL.</param>
-/// <param name="EsPk">Indica si forma parte de la clave primaria.</param>
-/// <param name="EsUnicoCandidato">Indica si participa en alguna restricción/índice único (no PK).</param>
-public record InfoColumna(string Tabla, string Nombre, string Tipo, bool EsNulo, bool EsPk, bool EsUnicoCandidato);
-
-/// <summary>
-/// Llave foránea agrupada (posiblemente multicolumna).
-/// </summary>
-/// <param name="Nombre">Nombre de la FK.</param>
-/// <param name="TablaPadre">Tabla referenciada (lado 1).</param>
-/// <param name="TablaHija">Tabla que contiene la FK (lado N/0..1).</param>
-/// <param name="ColumnasPadreCsv">Columnas PK/UK referenciadas (en orden).</param>
-/// <param name="ColumnasHijaCsv">Columnas FK en la hija (en orden).</param>
-/// <param name="HijaEsUnica">True si el conjunto de columnas hija está cubierto por un índice único.</param>
-/// <param name="HijaTodasNoNulas">True si todas las columnas FK en la hija son NOT NULL.</param>
-public record InfoLlaveForanea(
-    string Nombre, string TablaPadre, string TablaHija,
-    string ColumnasPadreCsv, string ColumnasHijaCsv,
-    bool HijaEsUnica, bool HijaTodasNoNulas);
-
-/// <summary>
-/// Contenedor con toda la instantánea necesaria para construir el diagrama.
-/// </summary>
-public class InstantaneaEsquema
-{
-    /// <summary>Tablas del esquema (excluye del sistema).</summary>
-    public List<InfoTabla> Tablas { get; } = new();
-
-    /// <summary>Todas las columnas con flags de PK/Único/Nulabilidad.</summary>
-    public List<InfoColumna> Columnas { get; } = new();
-
-    /// <summary>Llaves foráneas (agrupadas) con cardinalidad/participación inferida.</summary>
-    public List<InfoLlaveForanea> LlavesForaneas { get; } = new();
-
-    /// <summary>Nombres de tablas puente (M:N) identificadas por heurística.</summary>
-    public HashSet<string> TablasUnionMuchosAMuchos { get; } = new();
-
-    /// <summary>Entidades débiles (PK incluye alguna FK) detectadas por heurística.</summary>
-    public HashSet<string> EntidadesDebiles { get; } = new();
-}
-
-/// <summary>
-/// Lector de metadatos desde SQL Server, basado en catálogos del sistema.
-/// Devuelve una <see cref="InstantaneaEsquema"/> lista para alimentar el constructor del diagrama.
+/// Lector de metadatos desde SQL Server basado en los catálogos del sistema.
+/// Devuelve una <see cref="InstantaneaEsquema"/> lista para alimentar los diagramas.
 /// </summary>
 public class LectorEsquemaSql
 {
-    private readonly string _cnnMaestra;
+    private readonly string _conexionMaestra;
 
     /// <summary>
-    /// Crea el lector con una cadena de conexión "maestra" (server/credenciales),
-    /// desde la cual se apuntará dinámicamente al catálogo de la BD restaurada.
+    /// Crea el lector con una cadena de conexión "maestra" (servidor/credenciales) desde la
+    /// cual se apuntará dinámicamente al catálogo de la base restaurada.
     /// </summary>
-    public LectorEsquemaSql(IConfiguration cfg) => _cnnMaestra = cfg.GetConnectionString("SqlMaestra")!;
+    public LectorEsquemaSql(IConfiguration cfg)
+        => _conexionMaestra = cfg.GetConnectionString("SqlMaestra")!;
 
     /// <summary>
-    /// Construye una cadena de conexión a una BD específica reutilizando servidor/credenciales de la cadena maestra.
+    /// Construye una cadena de conexión a una base específica reutilizando servidor/credenciales
+    /// de la cadena maestra.
     /// </summary>
-    private static string CnnDeBD(string cnnMaestra, string nombreBD)
+    private static string CadenaConexionBd(string conexionMaestra, string nombreBd)
     {
-        var csb = new SqlConnectionStringBuilder(cnnMaestra) { InitialCatalog = nombreBD };
+        var csb = new SqlConnectionStringBuilder(conexionMaestra) { InitialCatalog = nombreBd };
         return csb.ToString();
     }
 
     /// <summary>
     /// Lee el esquema (tablas, columnas, FKs, heurísticas) de la base indicada.
     /// </summary>
-    /// <param name="nombreBD">Nombre de la base restaurada.</param>
+    /// <param name="nombreBd">Nombre de la base restaurada.</param>
     /// <returns>Instantánea del esquema para diagrama ER/EER.</returns>
-    public async Task<InstantaneaEsquema> LeerAsync(string nombreBD)
+    public async Task<InstantaneaEsquema> LeerAsync(string nombreBd)
     {
         var s = new InstantaneaEsquema();
 
-        using var cn = new SqlConnection(CnnDeBD(_cnnMaestra, nombreBD));
+        using var cn = new SqlConnection(CadenaConexionBd(_conexionMaestra, nombreBd));
         await cn.OpenAsync();
 
         // =========================
@@ -113,8 +57,7 @@ public class LectorEsquemaSql
         // =========================
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = @"
-WITH pkcols AS (
+            cmd.CommandText = @"WITH pkcols AS (
   SELECT ic.object_id, ic.column_id
   FROM sys.key_constraints pk
   JOIN sys.index_columns ic
@@ -160,8 +103,7 @@ ORDER BY t.name, c.column_id;";
         // =========================
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = @"
-WITH fkcols AS (
+            cmd.CommandText = @"WITH fkcols AS (
   SELECT fk.object_id AS fk_id, fk.name AS FK_Nombre,
          rt.name AS TablaPadre, t.name AS TablaHija,
          pc.name AS ColPadre, cc.name AS ColHija, cc.column_id
@@ -223,18 +165,17 @@ ORDER BY g.TablaPadre, g.TablaHija;";
                     rd.GetString(3),             // cols padre csv
                     rd.GetString(4),             // cols hija csv
                     rd.GetInt32(5) == 1,         // hija es única
-                    rd.GetInt32(6) == 1));       // ***YA CORRECTO*** todas NOT NULL
+                    rd.GetInt32(6) == 1));       // todas NOT NULL
             }
         }
 
         // =========================
         // 4) Tablas de unión M:N (heurística)
-        //    - PK de 2 columnas, al menos 2 FKs, y referencia exactamente a 2 tablas distintas.
+        //    - PK de 2 columnas, al menos 2 FKs y referencia exactamente a 2 tablas distintas.
         // =========================
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = @"
-WITH pkcols AS (
+            cmd.CommandText = @"WITH pkcols AS (
   SELECT t.object_id, t.name AS Tabla, kc.name AS PKName, COUNT(*) AS PKCols
   FROM sys.key_constraints kc
   JOIN sys.tables t ON t.object_id = kc.parent_object_id
@@ -264,8 +205,7 @@ WHERE p.PKCols = 2 AND f.FKs >= 2 AND f.TablasReferenciadas = 2;";
         // =========================
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = @"
-SELECT t.name AS TablaDebil
+            cmd.CommandText = @"SELECT t.name AS TablaDebil
 FROM sys.tables t
 JOIN sys.key_constraints pk ON pk.parent_object_id = t.object_id AND pk.[type] = 'PK'
 JOIN sys.foreign_keys fk    ON fk.parent_object_id = t.object_id

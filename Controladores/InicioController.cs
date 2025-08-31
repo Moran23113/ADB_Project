@@ -1,14 +1,14 @@
 using System.Diagnostics;
-using ABD_Project.Models;
+using ABD_Project.Modelos;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ABD_Project.Controllers
+namespace ABD_Project.Controladores
 {
-    public class HomeController : Controller
+    public class InicioController : Controller
     {
-        private readonly ILogger<HomeController> _logger;
+        private readonly ILogger<InicioController> _logger;
 
-        public HomeController(ILogger<HomeController> logger)
+        public InicioController(ILogger<InicioController> logger)
         {
             _logger = logger;
         }
@@ -18,7 +18,7 @@ namespace ABD_Project.Controllers
             return View();
         }
 
-        public IActionResult Privacy()
+        public IActionResult Privacidad()
         {
             return View();
         }
@@ -26,7 +26,7 @@ namespace ABD_Project.Controllers
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            return View(new ModeloVistaError { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
     }
 }

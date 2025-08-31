@@ -3,8 +3,13 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
+using ABD_Project.Modelos;
 
-public class ConstructorDiagramaRelacional
+/// <summary>
+/// Renderizador que genera un diagrama relacional (erDiagram) en Mermaid.
+/// Marca claves primarias y foráneas y oculta tablas internas.
+/// </summary>
+public class RenderizadorRelacional
 {
     private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
 
