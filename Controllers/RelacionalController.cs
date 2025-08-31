@@ -18,7 +18,7 @@ public class RelacionalController : Controller
     /// /Relacional?nombreBD=ER_XXXXXXXX
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> ModeloR(string nombreBD)
+    public IActionResult ModeloR(string nombreBD)
     {
         if (string.IsNullOrWhiteSpace(nombreBD))
         {
@@ -28,7 +28,7 @@ public class RelacionalController : Controller
 
         try
         {
-            var snap = await _lector.LeerAsync(nombreBD);
+            var snap = _lector.Leer(nombreBD);
             ViewBag.NombreBD = nombreBD;
             ViewBag.MermaidRel = _constructorRel.Construir(snap);
             return View();

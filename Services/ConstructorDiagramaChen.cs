@@ -1,53 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 
 /// <summary>
 /// Construye un diagrama ER en notación Chen usando sintaxis de Mermaid (flowchart),
 /// a partir de una instantánea del esquema (tablas, columnas, FKs, etc.).
-/// - Pinta entidades (cuadros), atributos (óvalos) y relaciones (rombos).
-/// - Dibuja cardinalidades 1, 0..1, 1..N, 0..N según la unicidad y nulabilidad de las FKs.
-/// - Trata tablas puente (M:N) como relaciones con atributos.
 /// </summary>
 public class ConstructorDiagramaChen
 {
-    // Regex para sanear IDs de nodos en Mermaid (solo letras, números y guion bajo).
-    private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
-
-    /// <summary>
-    /// Sanea un identificador para que sea válido en Mermaid:
-    /// - Reemplaza caracteres no permitidos por "_".
-    /// - Si no inicia con letra, antepone "N_".
-    /// - Limita a 60 caracteres (Mermaid puede romper con IDs larguísimos).
-    /// </summary>
-    private static string San(string? id)
-    {
-        var s = id ?? "X";
-        s = _idBad.Replace(s, "_");
-        if (string.IsNullOrEmpty(s) || !char.IsLetter(s[0]))
-            s = "N_" + s;
-        if (s.Length > 60) s = s[..60];
-        return s;
-    }
-
-    /// <summary>
-    /// Escapa texto para que no rompa el parser de Mermaid:
-    /// - Backslashes, comillas, saltos de línea y llaves.
-    /// </summary>
-    private static string Esc(string? txt)
-    {
-        if (string.IsNullOrEmpty(txt)) return "";
-        return txt
-            .Replace("\\", "\\\\")   // backslash
-            .Replace("\"", "\\\"")   // comillas
-            .Replace("\r", " ")      // CR
-            .Replace("\n", " ")      // LF
-            .Replace("{", "\\{")     // llaves
-            .Replace("}", "\\}");    // llaves
-    }
-
     /// <summary>
     /// Construye el diagrama Mermaid (flowchart LR) en notación tipo Chen.
     /// </summary>
@@ -59,9 +20,9 @@ public class ConstructorDiagramaChen
 
         // Tablas internas que no deben dibujarse
         var ocultas = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "EER_UserChoices"
-    };
+        {
+            "EER_UserChoices",
+        };
 
         // Encabezado y estilos
         sb.AppendLine("flowchart LR");
@@ -71,19 +32,31 @@ public class ConstructorDiagramaChen
         sb.AppendLine("classDef clave font-weight:bold,text-decoration:underline;");
         sb.AppendLine("classDef unico stroke-dasharray:3 2;");
 
-        // -------- Entidades --------
+        RenderEntidades(sb, s, ocultas);
+        RenderRelacionesBinarias(sb, s, ocultas);
+        RenderRelacionesMN(sb, s, ocultas);
+        RenderEntidadesDebiles(sb, s, ocultas);
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Pinta las entidades y sus atributos a partir de las tablas.
+    /// </summary>
+    private static void RenderEntidades(StringBuilder sb, InstantaneaEsquema s, HashSet<string> ocultas)
+    {
         foreach (var t in s.Tablas)
         {
-            if (ocultas.Contains(t.Nombre)) continue; // 👈 filtra EER_UserChoices
+            if (ocultas.Contains(t.Nombre)) continue;
             if (s.TablasUnionMuchosAMuchos.Contains(t.Nombre)) continue;
 
-            var entId = San(t.Nombre);
-            sb.AppendLine($"  {entId}[{Esc(t.Nombre)}]:::entidad");
+            var entId = MermaidUtils.SanitizeId(t.Nombre);
+            sb.AppendLine($"  {entId}[{MermaidUtils.EscapeText(t.Nombre)}]:::entidad");
 
             foreach (var c in s.Columnas.Where(x => x.Tabla == t.Nombre))
             {
-                var attrId = $"{entId}__{San(c.Nombre)}";
-                sb.AppendLine($"  {attrId}(({Esc(c.Nombre)})):::atributo");
+                var attrId = $"{entId}__{MermaidUtils.SanitizeId(c.Nombre)}";
+                sb.AppendLine($"  {attrId}(({MermaidUtils.EscapeText(c.Nombre)})):::atributo");
 
                 if (c.EsPk) sb.AppendLine($"  class {attrId} clave;");
                 else if (c.EsUnicoCandidato) sb.AppendLine($"  class {attrId} unico;");
@@ -91,32 +64,43 @@ public class ConstructorDiagramaChen
                 sb.AppendLine($"  {attrId} --- {entId}");
             }
         }
+    }
 
-        // -------- Relaciones binarias (FKs) --------
+    /// <summary>
+    /// Dibuja las relaciones binarias basadas en llaves foráneas.
+    /// </summary>
+    private static void RenderRelacionesBinarias(StringBuilder sb, InstantaneaEsquema s, HashSet<string> ocultas)
+    {
         int r = 0;
         foreach (var fk in s.LlavesForaneas)
         {
-            if (ocultas.Contains(fk.TablaPadre) || ocultas.Contains(fk.TablaHija)) continue; // 👈 filtra
+            if (ocultas.Contains(fk.TablaPadre) || ocultas.Contains(fk.TablaHija)) continue;
             if (s.TablasUnionMuchosAMuchos.Contains(fk.TablaHija)) continue;
 
-            var relId = $"REL_{r++}_{San(fk.Nombre)}";
-            sb.AppendLine($"  {relId}{{{{{Esc(fk.Nombre)}}}}}:::relacion");
-            sb.AppendLine($"  {San(fk.TablaPadre)} -- \"1\" --> {relId}");
+            var relId = $"REL_{r++}_{MermaidUtils.SanitizeId(fk.Nombre)}";
+            sb.AppendLine($"  {relId}{{{{{MermaidUtils.EscapeText(fk.Nombre)}}}}}:::relacion");
+            sb.AppendLine($"  {MermaidUtils.SanitizeId(fk.TablaPadre)} -- \"1\" --> {relId}");
 
             string mult = fk.HijaEsUnica
                 ? (fk.HijaTodasNoNulas ? "1" : "0..1")
                 : (fk.HijaTodasNoNulas ? "1..N" : "0..N");
 
             if (fk.HijaTodasNoNulas)
-                sb.AppendLine($"  {relId} -- \"{mult}\" --> {San(fk.TablaHija)}");
+                sb.AppendLine($"  {relId} -- \"{mult}\" --> {MermaidUtils.SanitizeId(fk.TablaHija)}");
             else
-                sb.AppendLine($"  {relId} -. \"{mult}\" .-> {San(fk.TablaHija)}");
+                sb.AppendLine($"  {relId} -. \"{mult}\" .-> {MermaidUtils.SanitizeId(fk.TablaHija)}");
         }
+    }
 
-        // -------- Relaciones M:N --------
+    /// <summary>
+    /// Representa las relaciones muchos a muchos a partir de tablas puente.
+    /// </summary>
+    private static void RenderRelacionesMN(StringBuilder sb, InstantaneaEsquema s, HashSet<string> ocultas)
+    {
         foreach (var jt in s.TablasUnionMuchosAMuchos)
         {
-            if (ocultas.Contains(jt)) continue; // 👈 filtra
+            if (ocultas.Contains(jt)) continue;
+
             var padres = s.LlavesForaneas
                 .Where(f => f.TablaHija == jt)
                 .Select(f => f.TablaPadre)
@@ -125,11 +109,11 @@ public class ConstructorDiagramaChen
 
             if (padres.Count == 2)
             {
-                var relId = $"MN_{San(jt)}";
-                sb.AppendLine($"  {relId}{{{{{Esc(jt)}}}}}:::relacion");
+                var relId = $"MN_{MermaidUtils.SanitizeId(jt)}";
+                sb.AppendLine($"  {relId}{{{{{MermaidUtils.EscapeText(jt)}}}}}:::relacion");
 
-                sb.AppendLine($"  {San(padres[0])} -- \"1..N\" --> {relId}");
-                sb.AppendLine($"  {relId} -- \"1..N\" --> {San(padres[1])}");
+                sb.AppendLine($"  {MermaidUtils.SanitizeId(padres[0])} -- \"1..N\" --> {relId}");
+                sb.AppendLine($"  {relId} -- \"1..N\" --> {MermaidUtils.SanitizeId(padres[1])}");
 
                 var fkCols = new HashSet<string>(
                     s.LlavesForaneas.Where(f => f.TablaHija == jt)
@@ -139,19 +123,22 @@ public class ConstructorDiagramaChen
                 var attrsRelacion = s.Columnas.Where(c => c.Tabla == jt && !fkCols.Contains(c.Nombre));
                 foreach (var c in attrsRelacion)
                 {
-                    var aid = $"{San(jt)}__{San(c.Nombre)}";
-                    sb.AppendLine($"  {aid}(({Esc(c.Nombre)})):::atributo");
+                    var aid = $"{MermaidUtils.SanitizeId(jt)}__{MermaidUtils.SanitizeId(c.Nombre)}";
+                    sb.AppendLine($"  {aid}(({MermaidUtils.EscapeText(c.Nombre)})):::atributo");
                     if (c.EsPk) sb.AppendLine($"  class {aid} clave;");
                     sb.AppendLine($"  {aid} --- {relId}");
                 }
             }
         }
-
-        foreach (var w in s.EntidadesDebiles)
-            if (!ocultas.Contains(w)) // 👈 también aquí
-                sb.AppendLine($"  %% {w} es ENTIDAD DEBIL (PK incluye FK)");
-
-        return sb.ToString();
     }
 
+    /// <summary>
+    /// Anota en el diagrama las entidades débiles detectadas.
+    /// </summary>
+    private static void RenderEntidadesDebiles(StringBuilder sb, InstantaneaEsquema s, HashSet<string> ocultas)
+    {
+        foreach (var w in s.EntidadesDebiles)
+            if (!ocultas.Contains(w))
+                sb.AppendLine($"  %% {w} es ENTIDAD DEBIL (PK incluye FK)");
+    }
 }

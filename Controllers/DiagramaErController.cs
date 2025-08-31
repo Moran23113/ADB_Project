@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using System.Linq;
 
 #region Controlador: Diagrama ER / EER
@@ -95,11 +94,7 @@ public class DiagramaErController : Controller
             nombreBD = await _restaurador.RestaurarAsync(rutaBak, "ER");
 
             // 2) Leer el esquema de la BD restaurada (tablas, columnas, PKs, FKs...).
-            var snap = await _lector.LeerAsync(nombreBD);
-
-            // 2.b) Construir cadena de conexión hacia la BD restaurada.
-            //     (Se usa para leer/guardar elecciones EER en esa misma BD).
-            var cnnRestaurada = EERChoicesRestored.BuildCnnToRestoredDb(_cfg, nombreBD);
+            var snap = _lector.Leer(nombreBD);
 
             // 3) ER (Chen): generar Mermaid del modelo relacional.
             ViewBag.NombreBD = nombreBD;
@@ -107,25 +102,7 @@ public class DiagramaErController : Controller
 
             // 4) EER: detectar jerarquías de subtipos mediante heurística PK=FK (FK UNIQUE).
             var jerarquias = InferenciaEER.DetectarJerarquias(snap);
-
-            // 4.b) Aplicar elecciones guardadas previamente (si existen) desde la BD restaurada.
-            var choices = await EERChoicesRestored.LoadChoicesAsync(cnnRestaurada);
-            foreach (var j in jerarquias)
-            {
-                var subsCsv = string.Join(",", j.Subtipos.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-                var c = choices.FirstOrDefault(x =>
-                    x.sup.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
-                    x.subs.Equals(subsCsv, StringComparison.OrdinalIgnoreCase));
-
-                if (!string.IsNullOrEmpty(c.sup))
-                {
-                    j.Disyuncion = c.dis.Equals("Exclusive", StringComparison.OrdinalIgnoreCase)
-                        ? EerDisjointness.Exclusive : EerDisjointness.Overlapping;
-                    j.Totalidad = c.tot.Equals("Total", StringComparison.OrdinalIgnoreCase)
-                        ? EerTotalness.Total : EerTotalness.Partial;
-                    j.Evidencia = "Elección del usuario aplicada.";
-                }
-            }
+            await AplicarEleccionesAsync(nombreBD, jerarquias);
 
             // 4.c) Render EER en Mermaid (con etiqueta "especializacion").
             ViewBag.MermaidEER = InferenciaEER.RenderMermaidEER(jerarquias);
@@ -170,6 +147,32 @@ public class DiagramaErController : Controller
     }
 
     /// <summary>
+    /// Aplica elecciones guardadas de disyunción/totalidad a las jerarquías detectadas.
+    /// </summary>
+    private async Task AplicarEleccionesAsync(string nombreBD, List<JerarquiaEer> jerarquias)
+    {
+        var cnnRestaurada = EERChoicesRestored.BuildCnnToRestoredDb(_cfg, nombreBD);
+        var choices = await EERChoicesRestored.LoadChoicesAsync(cnnRestaurada);
+
+        foreach (var j in jerarquias)
+        {
+            var subsCsv = string.Join(",", j.Subtipos.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            var c = choices.FirstOrDefault(x =>
+                x.sup.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
+                x.subs.Equals(subsCsv, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrEmpty(c.sup))
+            {
+                j.Disyuncion = c.dis.Equals("Exclusive", StringComparison.OrdinalIgnoreCase)
+                    ? EerDisjointness.Exclusive : EerDisjointness.Overlapping;
+                j.Totalidad = c.tot.Equals("Total", StringComparison.OrdinalIgnoreCase)
+                    ? EerTotalness.Total : EerTotalness.Partial;
+                j.Evidencia = "Elección del usuario aplicada.";
+            }
+        }
+    }
+
+    /// <summary>
     /// Guarda las elecciones del usuario para Disyunción/Totalidad de cada jerarquía EER
     /// directamente en la BD restaurada y re-renderiza los diagramas.
     /// </summary>
@@ -192,30 +195,13 @@ public class DiagramaErController : Controller
             await EERChoicesRestored.SaveChoicesAsync(cnnRestaurada, Disyuncion, Totalidad, SubtypesCsv);
 
             // 2) Releer esquema y reconstruir diagramas (ER + EER) tras aplicar elecciones.
-            var snap = await _lector.LeerAsync(NombreBD);
+            var snap = _lector.Leer(NombreBD);
 
             ViewBag.NombreBD = NombreBD;
             ViewBag.Mermaid = _constructor.Construir(snap);
 
             var jerarquias = InferenciaEER.DetectarJerarquias(snap);
-
-            var choices = await EERChoicesRestored.LoadChoicesAsync(cnnRestaurada);
-            foreach (var j in jerarquias)
-            {
-                var subsCsv = string.Join(",", j.Subtipos.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-                var c = choices.FirstOrDefault(x =>
-                    x.sup.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
-                    x.subs.Equals(subsCsv, StringComparison.OrdinalIgnoreCase));
-
-                if (!string.IsNullOrEmpty(c.sup))
-                {
-                    j.Disyuncion = c.dis.Equals("Exclusive", StringComparison.OrdinalIgnoreCase)
-                        ? EerDisjointness.Exclusive : EerDisjointness.Overlapping;
-                    j.Totalidad = c.tot.Equals("Total", StringComparison.OrdinalIgnoreCase)
-                        ? EerTotalness.Total : EerTotalness.Partial;
-                    j.Evidencia = "Elección del usuario aplicada.";
-                }
-            }
+            await AplicarEleccionesAsync(NombreBD, jerarquias);
 
             ViewBag.MermaidEER = InferenciaEER.RenderMermaidEER(jerarquias);
 

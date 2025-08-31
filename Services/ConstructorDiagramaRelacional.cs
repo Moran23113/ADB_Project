@@ -8,28 +8,6 @@ public class ConstructorDiagramaRelacional
 {
     private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
 
-    private static string San(string? id)
-    {
-        var s = id ?? "X";
-        s = _idBad.Replace(s, "_");
-        if (string.IsNullOrEmpty(s) || !char.IsLetter(s[0])) s = "N_" + s;
-        if (s.Length > 60) s = s[..60];
-        return s;
-    }
-
-    // Escapar caracteres que rompen erDiagram, incluidas comillas
-    private static string Esc(string? txt)
-    {
-        if (string.IsNullOrEmpty(txt)) return "";
-        return txt.Replace("\r", " ")
-                  .Replace("\n", " ")
-                  .Replace("\"", "&quot;")
-                  .Replace("<", "&lt;")
-                  .Replace(">", "&gt;")
-                  .Replace("{", "\\{").Replace("}", "\\}")
-                  .Replace("[", "&#91;").Replace("]", "&#93;");
-    }
-
     private static string MapTipo(string t) => t switch
     {
         "int" => "int",
@@ -74,7 +52,7 @@ public class ConstructorDiagramaRelacional
             fksPorTabla.TryGetValue(t, out var fkCols);
             fkCols ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            sb.AppendLine($"  {San(t)} {{");
+            sb.AppendLine($"  {MermaidUtils.SanitizeId(t)} {{");
             foreach (var c in s.Columnas.Where(c => c.Tabla == t))
             {
                 var tipo = MapTipo(c.Tipo);
@@ -86,7 +64,7 @@ public class ConstructorDiagramaRelacional
                 if (c.EsUnicoCandidato && !c.EsPk) flags.Add("UK"); // si ya es PK, no repito UK
 
                 var flagTxt = flags.Count > 0 ? " " + string.Join(" ", flags) : "";
-                sb.AppendLine($"    {Esc(tipo)} {Esc(c.Nombre)}{flagTxt}");
+                sb.AppendLine($"    {MermaidUtils.EscapeText(tipo)} {MermaidUtils.EscapeText(c.Nombre)}{flagTxt}");
             }
             sb.AppendLine("  }");
         }
@@ -101,8 +79,8 @@ public class ConstructorDiagramaRelacional
                 ? (fk.HijaTodasNoNulas ? "||" : "o|")   // 1:1 o 0..1
                 : (fk.HijaTodasNoNulas ? "|{" : "o{");  // 1:N o 0..N
 
-            var etiqueta = Esc(fk.Nombre);
-            sb.AppendLine($"  {San(fk.TablaPadre)} {left}--{right} {San(fk.TablaHija)} : \"{etiqueta}\"");
+            var etiqueta = MermaidUtils.EscapeText(fk.Nombre);
+            sb.AppendLine($"  {MermaidUtils.SanitizeId(fk.TablaPadre)} {left}--{right} {MermaidUtils.SanitizeId(fk.TablaHija)} : \"{etiqueta}\"");
         }
 
         return sb.ToString();

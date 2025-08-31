@@ -97,17 +97,6 @@ public static class InferenciaEER
     /// </summary>
     public static string RenderMermaidEER(IReadOnlyList<JerarquiaEer> hs)
     {
-        // Sanear IDs Mermaid
-        string San(string s)
-        {
-            var x = new string(s.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray());
-            if (x.Length == 0 || !char.IsLetter(x[0])) x = "N_" + x;
-            return x.Length > 60 ? x[..60] : x;
-        }
-        // Escapar texto para Mermaid
-        string Esc(string? s) =>
-            (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " ");
-
         var sb = new StringBuilder();
         sb.AppendLine("flowchart TB");
         sb.AppendLine("classDef super fill:#e8f4ff,stroke:#2a6fb3,stroke-width:1px,rx:8,ry:8;");
@@ -130,8 +119,8 @@ public static class InferenciaEER
                 _ => "ambiguous"
             };
 
-            var supId = San(h.Supertipo);
-            sb.AppendLine($"{supId}[\"{Esc(h.Supertipo)} ({tagDis},{tagTot})\"]:::super");
+            var supId = MermaidUtils.SanitizeId(h.Supertipo);
+            sb.AppendLine($"{supId}[\"{MermaidUtils.EscapeText(h.Supertipo)} ({tagDis},{tagTot})\"]:::super");
 
             var genId = $"GEN_{k++}_{supId}";
             sb.AppendLine($"{genId}[[especializacion]]:::note");
@@ -139,15 +128,15 @@ public static class InferenciaEER
 
             foreach (var sub in h.Subtipos.Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                var subId = San(sub);
-                sb.AppendLine($"{subId}(\"{Esc(sub)}\"):::sub");
+                var subId = MermaidUtils.SanitizeId(sub);
+                sb.AppendLine($"{subId}(\"{MermaidUtils.EscapeText(sub)}\"):::sub");
                 sb.AppendLine($"{subId} -->|is a| {genId}");
             }
 
             if (!string.IsNullOrWhiteSpace(h.Evidencia))
             {
                 var noteId = $"NOTE_{supId}";
-                sb.AppendLine($"{noteId}[\"{Esc(h.Evidencia)}\"]:::note");
+                sb.AppendLine($"{noteId}[\"{MermaidUtils.EscapeText(h.Evidencia)}\"]:::note");
                 sb.AppendLine($"{noteId} -.-> {supId}");
             }
         }
