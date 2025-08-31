@@ -1,10 +1,11 @@
-﻿@using System
+@model DiagramResultViewModel
+@using System
 @{
     ViewData["Title"] = "Diagrama estilo Chen + EER";
-    var mermaid = (string)ViewBag.Mermaid;
-    var nombreBD = (string)ViewBag.NombreBD;
-    var mermaidEer = ViewBag.MermaidEER as string;
-    var ambiguas = ViewBag.JerarquiasAmbiguas as List<JerarquiaEer>;
+    var mermaid = Model.MermaidEr;
+    var nombreBD = Model.NombreBD;
+    var mermaidEer = Model.MermaidEer;
+    var ambiguas = Model.JerarquiasAmbiguas;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-2">
