@@ -12,18 +12,18 @@ public static class InferenciaEER_Overrides
     /// Carga elecciones (sup, subs, dis, tot) y sobreescribe Disyunción/Totalidad
     /// en la lista de jerarquías. Marca la evidencia como “Elección del usuario aplicada.”.
     /// </summary>
-    /// <param name="loadChoices">Función que retorna la lista persistida de elecciones.</param>
+    /// <param name="cargarElecciones">Función que retorna la lista persistida de elecciones.</param>
     /// <param name="jerarquias">Jerarquías detectadas a modificar in place.</param>
     public static async Task AplicarOverridesAsync(
-        Func<Task<List<(string sup, string subs, string dis, string tot)>>> loadChoices,
+        Func<Task<List<(string sup, string subs, string dis, string tot)>>> cargarElecciones,
         List<JerarquiaEer> jerarquias)
     {
-        var choices = await loadChoices();
+        var elecciones = await cargarElecciones();
 
         foreach (var j in jerarquias)
         {
             var subsCsv = string.Join(",", j.Subtipos.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-            var c = choices.FirstOrDefault(x =>
+            var c = elecciones.FirstOrDefault(x =>
                 x.sup.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
                 x.subs.Equals(subsCsv, StringComparison.OrdinalIgnoreCase));
 

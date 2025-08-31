@@ -95,7 +95,7 @@ public class DiagramaErController : Controller
             nombreBD = await _restaurador.RestaurarAsync(rutaBak, "ER");
 
             // 2) Leer el esquema de la BD restaurada (tablas, columnas, PKs, FKs...).
-            var snap = await _lector.LeerAsync(nombreBD);
+            var instantanea = await _lector.LeerAsync(nombreBD);
 
             // 2.b) Construir cadena de conexión hacia la BD restaurada.
             //     (Se usa para leer/guardar elecciones EER en esa misma BD).
@@ -103,17 +103,17 @@ public class DiagramaErController : Controller
 
             // 3) ER (Chen): generar Mermaid del modelo relacional.
             ViewBag.NombreBD = nombreBD;
-            ViewBag.Mermaid = _constructor.Construir(snap);
+            ViewBag.Mermaid = _constructor.Construir(instantanea);
 
             // 4) EER: detectar jerarquías de subtipos mediante heurística PK=FK (FK UNIQUE).
-            var jerarquias = InferenciaEER.DetectarJerarquias(snap);
+            var jerarquias = InferenciaEER.DetectarJerarquias(instantanea);
 
             // 4.b) Aplicar elecciones guardadas previamente (si existen) desde la BD restaurada.
-            var choices = await EERChoicesRestored.LoadChoicesAsync(cnnRestaurada);
+            var elecciones = await EERChoicesRestored.LoadChoicesAsync(cnnRestaurada);
             foreach (var j in jerarquias)
             {
                 var subsCsv = string.Join(",", j.Subtipos.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-                var c = choices.FirstOrDefault(x =>
+                var c = elecciones.FirstOrDefault(x =>
                     x.sup.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
                     x.subs.Equals(subsCsv, StringComparison.OrdinalIgnoreCase));
 
@@ -187,23 +187,23 @@ public class DiagramaErController : Controller
     {
         try
         {
-            // 1) Guardar elecciones en la BD restaurada (tabla interna de choices).
+            // 1) Guardar elecciones en la BD restaurada (tabla interna de elecciones).
             var cnnRestaurada = EERChoicesRestored.BuildCnnToRestoredDb(_cfg, NombreBD);
             await EERChoicesRestored.SaveChoicesAsync(cnnRestaurada, Disyuncion, Totalidad, SubtypesCsv);
 
             // 2) Releer esquema y reconstruir diagramas (ER + EER) tras aplicar elecciones.
-            var snap = await _lector.LeerAsync(NombreBD);
+            var instantanea = await _lector.LeerAsync(NombreBD);
 
             ViewBag.NombreBD = NombreBD;
-            ViewBag.Mermaid = _constructor.Construir(snap);
+            ViewBag.Mermaid = _constructor.Construir(instantanea);
 
-            var jerarquias = InferenciaEER.DetectarJerarquias(snap);
+            var jerarquias = InferenciaEER.DetectarJerarquias(instantanea);
 
-            var choices = await EERChoicesRestored.LoadChoicesAsync(cnnRestaurada);
+            var elecciones = await EERChoicesRestored.LoadChoicesAsync(cnnRestaurada);
             foreach (var j in jerarquias)
             {
                 var subsCsv = string.Join(",", j.Subtipos.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-                var c = choices.FirstOrDefault(x =>
+                var c = elecciones.FirstOrDefault(x =>
                     x.sup.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
                     x.subs.Equals(subsCsv, StringComparison.OrdinalIgnoreCase));
 

@@ -22,7 +22,7 @@ public class ConstructorDiagramaChen
     /// - Si no inicia con letra, antepone "N_".
     /// - Limita a 60 caracteres (Mermaid puede romper con IDs larguísimos).
     /// </summary>
-    private static string San(string? id)
+    private static string SanearIdMermaid(string? id)
     {
         var s = id ?? "X";
         s = _idBad.Replace(s, "_");
@@ -36,7 +36,7 @@ public class ConstructorDiagramaChen
     /// Escapa texto para que no rompa el parser de Mermaid:
     /// - Backslashes, comillas, saltos de línea y llaves.
     /// </summary>
-    private static string Esc(string? txt)
+    private static string EscaparTextoMermaid(string? txt)
     {
         if (string.IsNullOrEmpty(txt)) return "";
         return txt
@@ -77,13 +77,13 @@ public class ConstructorDiagramaChen
             if (ocultas.Contains(t.Nombre)) continue; // 👈 filtra EER_UserChoices
             if (s.TablasUnionMuchosAMuchos.Contains(t.Nombre)) continue;
 
-            var entId = San(t.Nombre);
-            sb.AppendLine($"  {entId}[{Esc(t.Nombre)}]:::entidad");
+            var entId = SanearIdMermaid(t.Nombre);
+            sb.AppendLine($"  {entId}[{EscaparTextoMermaid(t.Nombre)}]:::entidad");
 
             foreach (var c in s.Columnas.Where(x => x.Tabla == t.Nombre))
             {
-                var attrId = $"{entId}__{San(c.Nombre)}";
-                sb.AppendLine($"  {attrId}(({Esc(c.Nombre)})):::atributo");
+                var attrId = $"{entId}__{SanearIdMermaid(c.Nombre)}";
+                sb.AppendLine($"  {attrId}(({EscaparTextoMermaid(c.Nombre)})):::atributo");
 
                 if (c.EsPk) sb.AppendLine($"  class {attrId} clave;");
                 else if (c.EsUnicoCandidato) sb.AppendLine($"  class {attrId} unico;");
@@ -99,18 +99,18 @@ public class ConstructorDiagramaChen
             if (ocultas.Contains(fk.TablaPadre) || ocultas.Contains(fk.TablaHija)) continue; // 👈 filtra
             if (s.TablasUnionMuchosAMuchos.Contains(fk.TablaHija)) continue;
 
-            var relId = $"REL_{r++}_{San(fk.Nombre)}";
-            sb.AppendLine($"  {relId}{{{{{Esc(fk.Nombre)}}}}}:::relacion");
-            sb.AppendLine($"  {San(fk.TablaPadre)} -- \"1\" --> {relId}");
+            var relId = $"REL_{r++}_{SanearIdMermaid(fk.Nombre)}";
+            sb.AppendLine($"  {relId}{{{{{EscaparTextoMermaid(fk.Nombre)}}}}}:::relacion");
+            sb.AppendLine($"  {SanearIdMermaid(fk.TablaPadre)} -- \"1\" --> {relId}");
 
             string mult = fk.HijaEsUnica
                 ? (fk.HijaTodasNoNulas ? "1" : "0..1")
                 : (fk.HijaTodasNoNulas ? "1..N" : "0..N");
 
             if (fk.HijaTodasNoNulas)
-                sb.AppendLine($"  {relId} -- \"{mult}\" --> {San(fk.TablaHija)}");
+                sb.AppendLine($"  {relId} -- \"{mult}\" --> {SanearIdMermaid(fk.TablaHija)}");
             else
-                sb.AppendLine($"  {relId} -. \"{mult}\" .-> {San(fk.TablaHija)}");
+                sb.AppendLine($"  {relId} -. \"{mult}\" .-> {SanearIdMermaid(fk.TablaHija)}");
         }
 
         // -------- Relaciones M:N --------
@@ -125,11 +125,11 @@ public class ConstructorDiagramaChen
 
             if (padres.Count == 2)
             {
-                var relId = $"MN_{San(jt)}";
-                sb.AppendLine($"  {relId}{{{{{Esc(jt)}}}}}:::relacion");
+                var relId = $"MN_{SanearIdMermaid(jt)}";
+                sb.AppendLine($"  {relId}{{{{{EscaparTextoMermaid(jt)}}}}}:::relacion");
 
-                sb.AppendLine($"  {San(padres[0])} -- \"1..N\" --> {relId}");
-                sb.AppendLine($"  {relId} -- \"1..N\" --> {San(padres[1])}");
+                sb.AppendLine($"  {SanearIdMermaid(padres[0])} -- \"1..N\" --> {relId}");
+                sb.AppendLine($"  {relId} -- \"1..N\" --> {SanearIdMermaid(padres[1])}");
 
                 var fkCols = new HashSet<string>(
                     s.LlavesForaneas.Where(f => f.TablaHija == jt)
@@ -139,8 +139,8 @@ public class ConstructorDiagramaChen
                 var attrsRelacion = s.Columnas.Where(c => c.Tabla == jt && !fkCols.Contains(c.Nombre));
                 foreach (var c in attrsRelacion)
                 {
-                    var aid = $"{San(jt)}__{San(c.Nombre)}";
-                    sb.AppendLine($"  {aid}(({Esc(c.Nombre)})):::atributo");
+                    var aid = $"{SanearIdMermaid(jt)}__{SanearIdMermaid(c.Nombre)}";
+                    sb.AppendLine($"  {aid}(({EscaparTextoMermaid(c.Nombre)})):::atributo");
                     if (c.EsPk) sb.AppendLine($"  class {aid} clave;");
                     sb.AppendLine($"  {aid} --- {relId}");
                 }

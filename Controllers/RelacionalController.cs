@@ -28,9 +28,9 @@ public class RelacionalController : Controller
 
         try
         {
-            var snap = await _lector.LeerAsync(nombreBD);
+            var instantanea = await _lector.LeerAsync(nombreBD);
             ViewBag.NombreBD = nombreBD;
-            ViewBag.MermaidRel = _constructorRel.Construir(snap);
+            ViewBag.MermaidRel = _constructorRel.Construir(instantanea);
             return View();
         }
         catch (Exception ex)
