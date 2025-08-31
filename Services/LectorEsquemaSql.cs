@@ -80,7 +80,7 @@ public class LectorEsquemaSql
     /// </summary>
     /// <param name="nombreBD">Nombre de la base restaurada.</param>
     /// <returns>Instantánea del esquema para diagrama ER/EER.</returns>
-    public Task<InstantaneaEsquema> LeerAsync(string nombreBD)
+    public InstantaneaEsquema Leer(string nombreBD)
     {
         var s = new InstantaneaEsquema();
 
@@ -96,16 +96,20 @@ public class LectorEsquemaSql
 
             s.Tablas.Add(new InfoTabla(t.Name));
 
+            // Columnas marcadas como únicas (índices únicos no PK)
             var uniqueCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (SmoIndex idx in t.Indexes)
-            {
                 if (idx.IsUnique && idx.IndexKeyType != IndexKeyType.DriPrimaryKey)
-                {
                     foreach (SmoIndexedColumn ic in idx.IndexedColumns)
                         uniqueCols.Add(ic.Name);
-                }
-            }
 
+            // Información de PK para heurísticas posteriores
+            var pk = t.Indexes.Cast<SmoIndex>().FirstOrDefault(i => i.IndexKeyType == IndexKeyType.DriPrimaryKey);
+            var pkCols = pk == null
+                ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(pk.IndexedColumns.Cast<SmoIndexedColumn>().Select(ic => ic.Name), StringComparer.OrdinalIgnoreCase);
+
+            // Registro de columnas con flags PK/UK/Null
             foreach (Column col in t.Columns)
             {
                 s.Columnas.Add(new InfoColumna(
@@ -117,14 +121,23 @@ public class LectorEsquemaSql
                     uniqueCols.Contains(col.Name)));
             }
 
+            int fkCount = 0;
+            var distinctRef = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            bool fkInPk = false;
+
+            // Llaves foráneas y cardinalidad/participación
             foreach (ForeignKey fk in t.ForeignKeys)
             {
+                fkCount++;
+                distinctRef.Add(fk.ReferencedTable);
+
                 var colsPadre = new List<string>();
                 var colsHija = new List<string>();
                 foreach (ForeignKeyColumn fkc in fk.Columns)
                 {
                     colsPadre.Add(fkc.ReferencedColumn);
                     colsHija.Add(fkc.Name);
+                    if (pkCols.Contains(fkc.Name)) fkInPk = true; // heurística de entidad débil
                 }
 
                 bool hijaUnica = t.Indexes.Cast<SmoIndex>().Any(i =>
@@ -143,39 +156,16 @@ public class LectorEsquemaSql
                     hijaUnica,
                     allNotNull));
             }
-        }
 
-        foreach (Table t in db.Tables)
-        {
-            if (t.IsSystemObject)
-                continue;
-
-            var pk = t.Indexes.Cast<SmoIndex>().FirstOrDefault(i => i.IndexKeyType == IndexKeyType.DriPrimaryKey);
-            int pkCols = pk?.IndexedColumns.Count ?? 0;
-            int fkCount = t.ForeignKeys.Count;
-            int distinctRef = t.ForeignKeys.Cast<ForeignKey>().Select(f => f.ReferencedTable).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-
-            if (pkCols == 2 && fkCount >= 2 && distinctRef == 2)
+            // Heurística: tabla puente M:N (PK con 2 columnas, 2 FKs a tablas distintas)
+            if (pkCols.Count == 2 && fkCount >= 2 && distinctRef.Count == 2)
                 s.TablasUnionMuchosAMuchos.Add(t.Name);
-        }
 
-        foreach (Table t in db.Tables)
-        {
-            if (t.IsSystemObject)
-                continue;
-
-            var pk = t.Indexes.Cast<SmoIndex>().FirstOrDefault(i => i.IndexKeyType == IndexKeyType.DriPrimaryKey);
-            if (pk == null)
-                continue;
-
-            var pkCols = new HashSet<string>(pk.IndexedColumns.Cast<SmoIndexedColumn>().Select(ic => ic.Name), StringComparer.OrdinalIgnoreCase);
-            bool fkInPk = t.ForeignKeys.Cast<ForeignKey>().Any(fk =>
-                fk.Columns.Cast<ForeignKeyColumn>().Any(fkc => pkCols.Contains(fkc.Name)));
-
+            // Heurística: entidad débil (alguna FK forma parte de la PK)
             if (fkInPk)
                 s.EntidadesDebiles.Add(t.Name);
         }
 
-        return Task.FromResult(s);
+        return s;
     }
 }
