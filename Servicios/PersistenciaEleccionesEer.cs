@@ -8,22 +8,24 @@ using System.Threading.Tasks;
 /// Persistencia de elecciones EER (Disyunción / Totalidad) dentro de la BD restaurada.
 /// Crea y usa la tabla interna dbo.EER_UserChoices (clave compuesta: Supertype + SubtypesCsv).
 /// </summary>
-public static class EERChoicesRestored
+public static class PersistenciaEleccionesEer
 {
     /// <summary>
     /// Construye la cadena a la BD restaurada reutilizando servidor/credenciales de "SqlMaestra".
     /// </summary>
-    public static string BuildCnnToRestoredDb(IConfiguration cfg, string nombreBD)
+    public static string ConstruirConexionBdRestaurada(IConfiguration cfg, string nombreBd)
     {
-        var csb = new SqlConnectionStringBuilder(cfg.GetConnectionString("SqlMaestra"));
-        csb.InitialCatalog = nombreBD;
+        var csb = new SqlConnectionStringBuilder(cfg.GetConnectionString("SqlMaestra"))
+        {
+            InitialCatalog = nombreBd
+        };
         return csb.ToString();
     }
 
     /// <summary>
     /// Asegura la existencia de dbo.EER_UserChoices en la BD (idempotente).
     /// </summary>
-    public static async Task EnsureTableAsync(string cnn)
+    public static async Task AsegurarTablaAsync(string conexion)
     {
         const string sql = @"
 IF OBJECT_ID('dbo.EER_UserChoices') IS NULL
@@ -36,7 +38,7 @@ BEGIN
     CONSTRAINT PK_EER_UserChoices PRIMARY KEY (Supertype, SubtypesCsv)
   );
 END";
-        using var cn = new SqlConnection(cnn);
+        using var cn = new SqlConnection(conexion);
         await cn.OpenAsync();
         using var cmd = new SqlCommand(sql, cn);
         await cmd.ExecuteNonQueryAsync();
@@ -45,13 +47,13 @@ END";
     /// <summary>
     /// Guarda (MERGE) las elecciones por Supertype/SubtypesCsv.
     /// </summary>
-    public static async Task SaveChoicesAsync(
-        string cnn,
+    public static async Task GuardarEleccionesAsync(
+        string conexion,
         Dictionary<string, string> disyuncion,
         Dictionary<string, string> totalidad,
-        Dictionary<string, string> subtypesCsv)
+        Dictionary<string, string> subtiposCsv)
     {
-        await EnsureTableAsync(cnn);
+        await AsegurarTablaAsync(conexion);
 
         const string mergeSql = @"
 MERGE dbo.EER_UserChoices AS t
@@ -61,14 +63,14 @@ WHEN MATCHED THEN UPDATE SET Disyuncion = @dis, Totalidad = @tot
 WHEN NOT MATCHED THEN INSERT (Supertype, SubtypesCsv, Disyuncion, Totalidad)
 VALUES (@sup, @subs, @dis, @tot);";
 
-        using var cn = new SqlConnection(cnn);
+        using var cn = new SqlConnection(conexion);
         await cn.OpenAsync();
 
         foreach (var sup in disyuncion.Keys)
         {
             var dis = disyuncion[sup];
             var tot = totalidad.TryGetValue(sup, out var t) ? t : "Partial";
-            var subs = subtypesCsv.TryGetValue(sup, out var s) ? s : "";
+            var subs = subtiposCsv.TryGetValue(sup, out var s) ? s : "";
 
             using var cmd = new SqlCommand(mergeSql, cn);
             cmd.Parameters.AddWithValue("@sup", sup);
@@ -82,11 +84,11 @@ VALUES (@sup, @subs, @dis, @tot);";
     /// <summary>
     /// Carga todas las elecciones almacenadas.
     /// </summary>
-    public static async Task<List<(string sup, string subs, string dis, string tot)>> LoadChoicesAsync(string cnn)
+    public static async Task<List<(string sup, string subs, string dis, string tot)>> CargarEleccionesAsync(string conexion)
     {
-        await EnsureTableAsync(cnn);
+        await AsegurarTablaAsync(conexion);
 
-        using var cn = new SqlConnection(cnn);
+        using var cn = new SqlConnection(conexion);
         await cn.OpenAsync();
         using var cmd = new SqlCommand(
             "SELECT Supertype, SubtypesCsv, Disyuncion, Totalidad FROM dbo.EER_UserChoices", cn);

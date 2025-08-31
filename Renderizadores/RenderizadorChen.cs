@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using ABD_Project.Modelos;
 
 /// <summary>
-/// Construye un diagrama ER en notación Chen usando sintaxis de Mermaid (flowchart),
-/// a partir de una instantánea del esquema (tablas, columnas, FKs, etc.).
-/// - Pinta entidades (cuadros), atributos (óvalos) y relaciones (rombos).
-/// - Dibuja cardinalidades 1, 0..1, 1..N, 0..N según la unicidad y nulabilidad de las FKs.
-/// - Trata tablas puente (M:N) como relaciones con atributos.
+/// Renderizador que genera un diagrama ER en notación Chen
+/// utilizando la sintaxis de Mermaid (flowchart).
+/// Pinta entidades, atributos y relaciones indicando cardinalidad.
 /// </summary>
-public class ConstructorDiagramaChen
+public class RenderizadorChen
 {
     // Regex para sanear IDs de nodos en Mermaid (solo letras, números y guion bajo).
     private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);

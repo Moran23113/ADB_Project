@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ABD_Project.Modelos;
 
 /// <summary>
 /// Aplica las elecciones del usuario (persistidas) sobre las jerarquías EER detectadas.
 /// </summary>
-public static class InferenciaEER_Overrides
+public static class AplicadorEleccionesEer
 {
     /// <summary>
     /// Carga elecciones (sup, subs, dis, tot) y sobreescribe Disyunción/Totalidad
@@ -14,11 +15,11 @@ public static class InferenciaEER_Overrides
     /// </summary>
     /// <param name="loadChoices">Función que retorna la lista persistida de elecciones.</param>
     /// <param name="jerarquias">Jerarquías detectadas a modificar in place.</param>
-    public static async Task AplicarOverridesAsync(
-        Func<Task<List<(string sup, string subs, string dis, string tot)>>> loadChoices,
+    public static async Task AplicarEleccionesAsync(
+        Func<Task<List<(string sup, string subs, string dis, string tot)>>> cargarElecciones,
         List<JerarquiaEer> jerarquias)
     {
-        var choices = await loadChoices();
+        var choices = await cargarElecciones();
 
         foreach (var j in jerarquias)
         {
@@ -30,9 +31,9 @@ public static class InferenciaEER_Overrides
             if (!string.IsNullOrEmpty(c.sup))
             {
                 j.Disyuncion = c.dis.Equals("Exclusive", StringComparison.OrdinalIgnoreCase)
-                    ? EerDisjointness.Exclusive : EerDisjointness.Overlapping;
+                    ? EerDisyuncion.Exclusiva : EerDisyuncion.Solapada;
                 j.Totalidad = c.tot.Equals("Total", StringComparison.OrdinalIgnoreCase)
-                    ? EerTotalness.Total : EerTotalness.Partial;
+                    ? EerTotalidad.Total : EerTotalidad.Parcial;
                 j.Evidencia = "Elección del usuario aplicada.";
             }
         }

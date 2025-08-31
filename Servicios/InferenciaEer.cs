@@ -2,34 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
-#region Modelos EER
-
-/// <summary>Estado de disyunción en la jerarquía EER.</summary>
-public enum EerDisjointness { Exclusive, Overlapping, Ambiguous }
-/// <summary>Estado de totalidad en la jerarquía EER.</summary>
-public enum EerTotalness { Total, Partial, Ambiguous }
-
-/// <summary>
-/// Jerarquía de especialización (EER) detectada:
-/// Supertipo, lista de Subtipos y heurísticas de Disyunción/Totalidad.
-/// </summary>
-public class JerarquiaEer
-{
-    public string Supertipo { get; init; } = "";
-    public List<string> Subtipos { get; } = new();
-    public EerDisjointness Disyuncion { get; set; } = EerDisjointness.Ambiguous;
-    public EerTotalness Totalidad { get; set; } = EerTotalness.Ambiguous;
-    public string? Evidencia { get; set; }
-}
-
-#endregion
+using ABD_Project.Modelos;
 
 /// <summary>
 /// Motor de inferencia EER: detecta jerarquías por patrón PK=FK (FK UNIQUE) y
 /// renderiza un diagrama Mermaid con etiqueta de “especialización”.
 /// </summary>
-public static class InferenciaEER
+public static class InferenciaEer
 {
     /// <summary>
     /// Detecta jerarquías de especialización (subtipos) por el patrón PK=FK:
@@ -75,14 +54,14 @@ public static class InferenciaEER
 
             if (disc is not null && !disc.EsNulo)
             {
-                j.Disyuncion = EerDisjointness.Exclusive;
-                j.Totalidad = EerTotalness.Ambiguous;
+                j.Disyuncion = EerDisyuncion.Exclusiva;
+                j.Totalidad = EerTotalidad.Ambigua;
                 j.Evidencia = $"Discriminador {disc.Nombre} en {j.Supertipo} (NOT NULL).";
             }
             else
             {
-                j.Disyuncion = j.Subtipos.Count > 1 ? EerDisjointness.Overlapping : EerDisjointness.Ambiguous;
-                j.Totalidad = EerTotalness.Ambiguous;
+                j.Disyuncion = j.Subtipos.Count > 1 ? EerDisyuncion.Solapada : EerDisyuncion.Ambigua;
+                j.Totalidad = EerTotalidad.Ambigua;
                 j.Evidencia = "Subtipos detectados por patrón PK=FK (FK UNIQUE).";
             }
 
@@ -95,7 +74,7 @@ public static class InferenciaEER
     /// <summary>
     /// Renderiza Mermaid (flowchart TB) para jerarquías EER con nodo “especialización”.
     /// </summary>
-    public static string RenderMermaidEER(IReadOnlyList<JerarquiaEer> hs)
+    public static string RenderizarMermaidEer(IReadOnlyList<JerarquiaEer> hs)
     {
         // Sanear IDs Mermaid
         string San(string s)
@@ -119,14 +98,14 @@ public static class InferenciaEER
         {
             var tagDis = h.Disyuncion switch
             {
-                EerDisjointness.Exclusive => "exclusive",
-                EerDisjointness.Overlapping => "overlapping",
+                EerDisyuncion.Exclusiva => "exclusive",
+                EerDisyuncion.Solapada => "overlapping",
                 _ => "ambiguous"
             };
             var tagTot = h.Totalidad switch
             {
-                EerTotalness.Total => "total",
-                EerTotalness.Partial => "partial",
+                EerTotalidad.Total => "total",
+                EerTotalidad.Parcial => "partial",
                 _ => "ambiguous"
             };
 
