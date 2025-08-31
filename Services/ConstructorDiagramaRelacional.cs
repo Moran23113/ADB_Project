@@ -1,39 +1,14 @@
-﻿using System;
-using System.Text;
+using System;
 using System.Collections.Generic;
 
 public class ConstructorDiagramaRelacional
 {
-    private static string San(string? id)
-    {
-        var src = string.IsNullOrEmpty(id) ? "X" : id;
-        var sb = new StringBuilder(src.Length);
-        foreach (var ch in src)
-            sb.Append(char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_');
-        var s = sb.ToString();
-        if (s.Length == 0 || !char.IsLetter(s[0])) s = "N_" + s;
-        return s.Length > 60 ? s[..60] : s;
-    }
-
     private static string Limpiar(string t)
     {
-        var sb = new StringBuilder(t.Length);
+        var sb = new System.Text.StringBuilder(t.Length);
         foreach (var ch in t)
             sb.Append(char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_');
         return sb.ToString();
-    }
-
-    // Escapar caracteres que rompen erDiagram, incluidas comillas
-    private static string Esc(string? txt)
-    {
-        if (string.IsNullOrEmpty(txt)) return "";
-        return txt.Replace("\r", " ")
-                  .Replace("\n", " ")
-                  .Replace("\"", "&quot;")
-                  .Replace("<", "&lt;")
-                  .Replace(">", "&gt;")
-                  .Replace("{", "\\{").Replace("}", "\\}")
-                  .Replace("[", "&#91;").Replace("]", "&#93;");
     }
 
     private static string MapTipo(string t) => t switch
@@ -47,19 +22,20 @@ public class ConstructorDiagramaRelacional
         "decimal" or "numeric" => "decimal",
         "float" => "float",
         "varchar" or "nvarchar" => "varchar",
-        _ => Limpiar(t) // simplifica tipos raros para Mermaid
+        _ => Limpiar(t)
     };
+
     /// Genera Mermaid erDiagram (crow’s foot) a partir de InstantaneaEsquema.
     public string Construir(InstantaneaEsquema s)
     {
         var ocultas = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EER_UserChoices" };
-        var sb = new StringBuilder();
-        sb.AppendLine("erDiagram");
+        var mb = new MermaidBuilder();
+        mb.AddRaw("erDiagram");
 
         var fksPorTabla = IndiceFksPorTabla(s);
-        AgregarTablas(sb, s, ocultas, fksPorTabla);
-        AgregarRelaciones(sb, s, ocultas);
-        return sb.ToString();
+        AgregarTablas(mb, s, ocultas, fksPorTabla);
+        AgregarRelaciones(mb, s, ocultas);
+        return mb.Build();
     }
 
     private static Dictionary<string, HashSet<string>> IndiceFksPorTabla(InstantaneaEsquema s)
@@ -79,7 +55,7 @@ public class ConstructorDiagramaRelacional
         return dict;
     }
 
-    private static void AgregarTablas(StringBuilder sb, InstantaneaEsquema s, HashSet<string> ocultas, Dictionary<string, HashSet<string>> fksPorTabla)
+    private static void AgregarTablas(MermaidBuilder mb, InstantaneaEsquema s, HashSet<string> ocultas, Dictionary<string, HashSet<string>> fksPorTabla)
     {
         foreach (var tabla in s.Tablas)
         {
@@ -89,7 +65,8 @@ public class ConstructorDiagramaRelacional
             fksPorTabla.TryGetValue(t, out var fkCols);
             fkCols ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            sb.AppendLine($"  {San(t)} {{");
+            var tid = MermaidUtils.SanitizeId(t);
+            mb.AddRaw($"  {tid} {{");
             foreach (var c in s.Columnas)
             {
                 if (c.Tabla != t) continue;
@@ -98,14 +75,14 @@ public class ConstructorDiagramaRelacional
                 if (c.EsPk) flags.Add("PK");
                 if (fkCols.Contains(c.Nombre)) flags.Add("FK");
                 if (c.EsUnicoCandidato && !c.EsPk) flags.Add("UK");
-                var flagTxt = flags.Count > 0 ? " " + string.Join(" ", flags) : "";
-                sb.AppendLine($"    {Esc(tipo)} {Esc(c.Nombre)}{flagTxt}");
+                var flagTxt = flags.Count > 0 ? " " + string.Join(" ", flags) : string.Empty;
+                mb.AddRaw($"    {MermaidUtils.EscapeText(tipo)} {MermaidUtils.EscapeText(c.Nombre)}{flagTxt}");
             }
-            sb.AppendLine("  }");
+            mb.AddRaw("  }");
         }
     }
 
-    private static void AgregarRelaciones(StringBuilder sb, InstantaneaEsquema s, HashSet<string> ocultas)
+    private static void AgregarRelaciones(MermaidBuilder mb, InstantaneaEsquema s, HashSet<string> ocultas)
     {
         foreach (var fk in s.LlavesForaneas)
         {
@@ -116,8 +93,8 @@ public class ConstructorDiagramaRelacional
                 ? (fk.HijaTodasNoNulas ? "||" : "o|")
                 : (fk.HijaTodasNoNulas ? "|{" : "o{");
 
-            var etiqueta = Esc(fk.Nombre);
-            sb.AppendLine($"  {San(fk.TablaPadre)} {left}--{right} {San(fk.TablaHija)} : \"{etiqueta}\"");
+            var etiqueta = MermaidUtils.EscapeText(fk.Nombre);
+            mb.AddRaw($"  {MermaidUtils.SanitizeId(fk.TablaPadre)} {left}--{right} {MermaidUtils.SanitizeId(fk.TablaHija)} : \"{etiqueta}\"");
         }
     }
 }
