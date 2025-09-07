@@ -62,32 +62,51 @@ WHERE NOT EXISTS (
         {
             sql = sql.Trim();
 
-            // SELECT cols FROM R WHERE cond
+            // Selección: SELECT cols FROM R WHERE cond
             var m = Regex.Match(sql, @"SELECT (.+) FROM (\w+) WHERE (.+)", RegexOptions.IgnoreCase);
             if (m.Success)
-                return $"σ_{{{m.Groups[3].Value}}}(π_{{{m.Groups[1].Value}}}({m.Groups[2].Value}))";
+            {
+                string cols = m.Groups[1].Value.Trim();
+                string rel = m.Groups[2].Value.Trim();
+                string cond = m.Groups[3].Value.Trim();
+                return $"σ_{{{cond}}}(π_{{{cols}}}({rel}))";
+            }
 
-            // SELECT cols FROM R
+            // Proyección: SELECT cols FROM R
             m = Regex.Match(sql, @"SELECT (.+) FROM (\w+)", RegexOptions.IgnoreCase);
             if (m.Success)
-                return $"π_{{{m.Groups[1].Value}}}({m.Groups[2].Value})";
+            {
+                string cols = m.Groups[1].Value.Trim();
+                string rel = m.Groups[2].Value.Trim();
+                return $"π_{{{cols}}}({rel})";
+            }
 
-            // JOIN
+            // JOIN: FROM R JOIN S ON cond
             m = Regex.Match(sql, @"FROM (\w+) JOIN (\w+) ON (.+)", RegexOptions.IgnoreCase);
             if (m.Success)
-                return $"{m.Groups[1].Value} ⋈_{{{m.Groups[3].Value}}} {m.Groups[2].Value}";
+            {
+                string left = m.Groups[1].Value.Trim();
+                string right = m.Groups[2].Value.Trim();
+                string cond = m.Groups[3].Value.Trim();
+                return $"{left} ⋈_{{{cond}}} {right}";
+            }
 
             // UNION
             m = Regex.Match(sql, @"(.+) UNION (.+)", RegexOptions.IgnoreCase);
             if (m.Success)
+            {
                 return $"({SQLtoAR(m.Groups[1].Value)}) ∪ ({SQLtoAR(m.Groups[2].Value)})";
+            }
 
             // EXCEPT
             m = Regex.Match(sql, @"(.+) EXCEPT (.+)", RegexOptions.IgnoreCase);
             if (m.Success)
+            {
                 return $"({SQLtoAR(m.Groups[1].Value)}) − ({SQLtoAR(m.Groups[2].Value)})";
+            }
 
             return "-- consulta no reconocida";
         }
+
     }
 }
