@@ -2,30 +2,7 @@
 using System.Linq;
 
 #region Controlador: Diagrama ER / EER
-/// <summary>
-/// Controlador MVC responsable de:
-/// 1) Subir un .bak, restaurarlo temporalmente, leer su esquema,
-/// 2) Construir el diagrama ER (Chen) y detectar jerarquías EER,
-/// 3) Renderizar Mermaid para ER y EER,
-/// 4) Guardar/Aplicar elecciones del usuario para disyunción/totalidad de EER,
-/// 5) Eliminar la BD restaurada.
-/// </summary>
-/// <remarks>
-/// Flujo principal:
-/// - GET /DiagramaEr/Subir → muestra formulario de carga.
-/// - POST /DiagramaEr/Subir(.bak) → restaura, lee, construye diagramas, muestra Resultado.
-/// - POST /DiagramaEr/GuardarChoices → guarda elecciones EER en la BD restaurada y re-renderiza.
-/// - POST /DiagramaEr/EliminarBase → borra la BD restaurada.
-/// 
-/// Dependencias inyectadas:
-/// - <see cref="ServicioRestauracionSql"/>: Restaura/Elimina bases desde .bak.
-/// - <see cref="LectorEsquemaSql"/>: Lee el esquema (tablas, columnas, FKs, pks).
-/// - <see cref="ConstructorDiagramaChen"/>: Genera Mermaid para ER (Chen).
-/// 
-/// Notas:
-/// - Las elecciones EER se guardan en la BD restaurada (tabla interna controlada por EERChoicesRestored).
-/// - El límite de carga está configurado en 1GB en este controlador (RequestSizeLimit).
-/// </remarks>
+
 public class DiagramaErController : Controller
 {
     private readonly IWebHostEnvironment _entorno;
@@ -35,9 +12,7 @@ public class DiagramaErController : Controller
     private readonly ConstructorDiagramaChen _constructor;
 
 
-    /// <summary>
-    /// Crea una nueva instancia del controlador.
-    /// </summary>
+ 
     public DiagramaErController(
         IWebHostEnvironment entorno,
         IConfiguration cfg,
@@ -52,18 +27,11 @@ public class DiagramaErController : Controller
         _constructor = constructor;
     }
 
-    /// <summary>
-    /// Muestra el formulario para subir un archivo .bak.
-    /// </summary>
+   
     [HttpGet]
     public IActionResult Subir() => View();
 
-    /// <summary>
-    /// Sube un archivo .bak, lo restaura en una BD temporal, lee su esquema
-    /// y construye los diagramas ER (Chen) y EER (Mermaid).
-    /// </summary>
-    /// <param name="archivoBak">Archivo .bak de la base a analizar.</param>
-    /// <returns>Vista Resultado con los diagramas y formulario de ambigüedades EER.</returns>
+
     [HttpPost]
     [RequestSizeLimit(1_000_000_000)] // 1 GB (ajustar según política)
     public async Task<IActionResult> Subir(IFormFile archivoBak)
@@ -127,10 +95,6 @@ public class DiagramaErController : Controller
         }
     }
 
-    /// <summary>
-    /// Elimina la base de datos restaurada temporalmente.
-    /// </summary>
-    /// <param name="nombreBD">Nombre de la BD a eliminar.</param>
     [HttpPost]
     public async Task<IActionResult> EliminarBase(string nombreBD)
     {
@@ -176,11 +140,6 @@ public class DiagramaErController : Controller
     /// Guarda las elecciones del usuario para Disyunción/Totalidad de cada jerarquía EER
     /// directamente en la BD restaurada y re-renderiza los diagramas.
     /// </summary>
-    /// <param name="NombreBD">Nombre de la BD restaurada (hidden en la vista).</param>
-    /// <param name="Disyuncion">Mapa: clave de jerarquía → "Exclusive" | "Overlapping".</param>
-    /// <param name="Totalidad">Mapa: clave de jerarquía → "Total" | "Partial".</param>
-    /// <param name="SubtypesCsv">Mapa: clave de jerarquía → subtipos (CSV normalizado y ordenado).</param>
-    /// <returns>Vista Resultado actualizada.</returns>
     [HttpPost]
     public async Task<IActionResult> GuardarChoices(
         string NombreBD,

@@ -18,16 +18,6 @@ public class ServicioRestauracionSql
         _cnnMaestra = cfg.GetConnectionString("SqlMaestra")!;
     }
 
-    /// <summary>
-    /// Restaura una base de datos desde un archivo .bak en el servidor SQL.
-    /// - Detecta las rutas por defecto del instance para data/log.
-    /// - Lee los nombres lógicos del backup (RESTORE FILELISTONLY).
-    /// - RESTORE DATABASE con MOVE a archivos físicos nuevos (.mdf/.ldf).
-    /// </summary>
-    /// <param name="rutaBak">Ruta absoluta del archivo .bak en el servidor (accesible por el servicio SQL Server).</param>
-    /// <param name="prefijoNombre">Prefijo para el nombre de la BD restaurada (por defecto "ER").</param>
-    /// <returns>Nombre de la base de datos restaurada.</returns>
-    /// <exception cref="Exception">Si el .bak no contiene archivos o es incompatible.</exception>
     public async Task<string> RestaurarAsync(string rutaBak, string prefijoNombre = "ER")
     {
         // Genera un nombre único y “amigable” (sin guiones, mayúsculas).
