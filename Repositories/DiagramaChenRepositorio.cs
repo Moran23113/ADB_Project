@@ -26,7 +26,6 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
         RenderizarEntidades(sb, esquema);
         RenderizarRelacionesBinarias(sb, esquema);
         RenderizarRelacionesMuchosAMuchos(sb, esquema);
-        RenderizarEntidadesDebiles(sb, esquema);
 
         return sb.ToString();
     }
@@ -114,10 +113,4 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
         }
     }
 
-    private static void RenderizarEntidadesDebiles(StringBuilder sb, InstantaneaEsquema esquema)
-    {
-        foreach (var entidad in esquema.EntidadesDebiles)
-            if (!TablasIgnoradas.Contains(entidad))
-                sb.AppendLine($"  %% {entidad} es ENTIDAD DEBIL (PK incluye FK)");
-    }
 }
