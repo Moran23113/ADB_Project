@@ -2,11 +2,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddSingleton<ServicioRestauracionSql>();
-builder.Services.AddSingleton<LectorEsquemaSql>();
+builder.Services.AddSingleton<IRestauracionRepositorio, RestauracionRepositorio>();
+builder.Services.AddSingleton<IEsquemaRepositorio, EsquemaRepositorio>();
 builder.Services.AddSingleton<ConstructorDiagramaChen>();
 builder.Services.AddSingleton<ConstructorDiagramaRelacional>();
-
+builder.Services.AddSingleton<ITraductorRelacional, TraductorRelacional>();
 
 var app = builder.Build();
 
@@ -28,6 +28,5 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=DiagramaEr}/{action=Subir}/{id?}");
-
 
 app.Run();

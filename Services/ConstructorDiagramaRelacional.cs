@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -6,9 +6,10 @@ using System.Collections.Generic;
 
 public class ConstructorDiagramaRelacional
 {
-    private static readonly Regex _idBad = new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
+    private static readonly Regex IdentificadorInvalido =
+        new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
 
-    private static string MapTipo(string t) => t switch
+    private static string MapearTipo(string tipo) => tipo switch
     {
         "int" => "int",
         "bigint" => "bigint",
@@ -19,70 +20,69 @@ public class ConstructorDiagramaRelacional
         "decimal" or "numeric" => "decimal",
         "float" => "float",
         "varchar" or "nvarchar" => "varchar",
-        _ => _idBad.Replace(t, "_") // simplifica tipos raros para Mermaid
+        _ => IdentificadorInvalido.Replace(tipo, "_")
     };
 
-    /// Genera Mermaid erDiagram (crow’s foot) a partir de InstantaneaEsquema.
-    public string Construir(InstantaneaEsquema s)
+    public string Construir(InstantaneaEsquema esquema)
     {
-        var ocultas = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EER_UserChoices" };
+        var tablasOcultas = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EER_UserChoices" };
         var sb = new StringBuilder();
         sb.AppendLine("erDiagram");
 
-        // --------- Índice: columnas FK por tabla (maneja FKs compuestas) ----------
-        var fksPorTabla = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var fk in s.LlavesForaneas)
+        var fkPorTabla = ObtenerColumnasFk(esquema);
+
+        foreach (var tabla in esquema.Tablas.Select(t => t.Nombre))
         {
-            if (!fksPorTabla.TryGetValue(fk.TablaHija, out var set))
+            if (tablasOcultas.Contains(tabla)) continue;
+
+            fkPorTabla.TryGetValue(tabla, out var columnasFk);
+            columnasFk ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            sb.AppendLine($"  {MermaidUtils.SanitizeId(tabla)} {{");
+            foreach (var columna in esquema.Columnas.Where(c => c.Tabla == tabla))
             {
-                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                fksPorTabla[fk.TablaHija] = set;
-            }
-
-            foreach (var col in fk.ColumnasHijaCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                set.Add(col);
-        }
-
-        // ------------------------- Tablas + columnas ------------------------------
-        foreach (var t in s.Tablas.Select(x => x.Nombre))
-        {
-            if (ocultas.Contains(t)) continue;
-
-            // Hash de FKs de esta tabla (si no tiene, set vacío)
-            fksPorTabla.TryGetValue(t, out var fkCols);
-            fkCols ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            sb.AppendLine($"  {MermaidUtils.SanitizeId(t)} {{");
-            foreach (var c in s.Columnas.Where(c => c.Tabla == t))
-            {
-                var tipo = MapTipo(c.Tipo);
-
-                // Flags: PK / FK / UK (sin paréntesis; Mermaid los muestra como texto a la derecha)
+                var tipo = MapearTipo(columna.Tipo);
                 var flags = new List<string>();
-                if (c.EsPk) flags.Add("PK");
-                if (fkCols.Contains(c.Nombre)) flags.Add("FK");
-                if (c.EsUnicoCandidato && !c.EsPk) flags.Add("UK"); // si ya es PK, no repito UK
-
-                var flagTxt = flags.Count > 0 ? " " + string.Join(" ", flags) : "";
-                sb.AppendLine($"    {MermaidUtils.EscapeText(tipo)} {MermaidUtils.EscapeText(c.Nombre)}{flagTxt}");
+                if (columna.EsPk) flags.Add("PK");
+                if (columnasFk.Contains(columna.Nombre)) flags.Add("FK");
+                if (columna.EsUnicoCandidato && !columna.EsPk) flags.Add("UK");
+                var sufijo = flags.Count > 0 ? " " + string.Join(" ", flags) : string.Empty;
+                sb.AppendLine($"    {MermaidUtils.EscapeText(tipo)} {MermaidUtils.EscapeText(columna.Nombre)}{sufijo}");
             }
             sb.AppendLine("  }");
         }
 
-        // --------------------------- Relaciones (patas) ---------------------------
-        foreach (var fk in s.LlavesForaneas)
+        foreach (var fk in esquema.LlavesForaneas)
         {
-            if (ocultas.Contains(fk.TablaPadre) || ocultas.Contains(fk.TablaHija)) continue;
+            if (tablasOcultas.Contains(fk.TablaPadre) || tablasOcultas.Contains(fk.TablaHija)) continue;
 
-            var left = "||"; // padre: exactamente 1
-            string right = fk.HijaEsUnica
-                ? (fk.HijaTodasNoNulas ? "||" : "o|")   // 1:1 o 0..1
-                : (fk.HijaTodasNoNulas ? "|{" : "o{");  // 1:N o 0..N
+            var padre = "||";
+            var hija = fk.HijaEsUnica
+                ? (fk.HijaTodasNoNulas ? "||" : "o|")
+                : (fk.HijaTodasNoNulas ? "|{" : "o{");
 
-            var etiqueta = MermaidUtils.EscapeText(fk.Nombre);
-            sb.AppendLine($"  {MermaidUtils.SanitizeId(fk.TablaPadre)} {left}--{right} {MermaidUtils.SanitizeId(fk.TablaHija)} : \"{etiqueta}\"");
+            sb.AppendLine($"  {MermaidUtils.SanitizeId(fk.TablaPadre)} {padre}--{hija} {MermaidUtils.SanitizeId(fk.TablaHija)} : \"{MermaidUtils.EscapeText(fk.Nombre)}\"");
         }
 
         return sb.ToString();
+    }
+
+    private static Dictionary<string, HashSet<string>> ObtenerColumnasFk(InstantaneaEsquema esquema)
+    {
+        var resultado = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var fk in esquema.LlavesForaneas)
+        {
+            if (!resultado.TryGetValue(fk.TablaHija, out var columnas))
+            {
+                columnas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                resultado[fk.TablaHija] = columnas;
+            }
+
+            foreach (var columna in fk.ColumnasHijaCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                columnas.Add(columna);
+        }
+
+        return resultado;
     }
 }

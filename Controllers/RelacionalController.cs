@@ -2,11 +2,11 @@
 
 public class RelacionalController : Controller
 {
-    private readonly LectorEsquemaSql _lector;
+    private readonly IEsquemaRepositorio _lector;
     private readonly ConstructorDiagramaRelacional _constructorRel;
 
     public RelacionalController(
-        LectorEsquemaSql lector,
+        IEsquemaRepositorio lector,
         ConstructorDiagramaRelacional constructorRel)
     {
         _lector = lector;

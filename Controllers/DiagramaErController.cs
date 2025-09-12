@@ -7,8 +7,8 @@ public class DiagramaErController : Controller
 {
     private readonly IWebHostEnvironment _entorno;
     private readonly IConfiguration _cfg;
-    private readonly ServicioRestauracionSql _restaurador;
-    private readonly LectorEsquemaSql _lector;
+    private readonly IRestauracionRepositorio _restaurador;
+    private readonly IEsquemaRepositorio _lector;
     private readonly ConstructorDiagramaChen _constructor;
 
 
@@ -16,8 +16,8 @@ public class DiagramaErController : Controller
     public DiagramaErController(
         IWebHostEnvironment entorno,
         IConfiguration cfg,
-        ServicioRestauracionSql restaurador,
-        LectorEsquemaSql lector,
+        IRestauracionRepositorio restaurador,
+        IEsquemaRepositorio lector,
         ConstructorDiagramaChen constructor)
     {
         _entorno = entorno;
