@@ -119,8 +119,8 @@ public static class InferenciaEER
                 _ => "ambiguous"
             };
 
-            var supId = MermaidUtils.SanitizeId(h.Supertipo);
-            sb.AppendLine($"{supId}[\"{MermaidUtils.EscapeText(h.Supertipo)} ({tagDis},{tagTot})\"]:::super");
+            var supId = MermaidUtils.Sanitizar(h.Supertipo);
+            sb.AppendLine($"{supId}[\"{MermaidUtils.Escapar(h.Supertipo)} ({tagDis},{tagTot})\"]:::super");
 
             var genId = $"GEN_{k++}_{supId}";
             sb.AppendLine($"{genId}[[especializacion]]:::note");
@@ -128,15 +128,15 @@ public static class InferenciaEER
 
             foreach (var sub in h.Subtipos.Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                var subId = MermaidUtils.SanitizeId(sub);
-                sb.AppendLine($"{subId}(\"{MermaidUtils.EscapeText(sub)}\"):::sub");
+                var subId = MermaidUtils.Sanitizar(sub);
+                sb.AppendLine($"{subId}(\"{MermaidUtils.Escapar(sub)}\"):::sub");
                 sb.AppendLine($"{subId} -->|is a| {genId}");
             }
 
             if (!string.IsNullOrWhiteSpace(h.Evidencia))
             {
                 var noteId = $"NOTE_{supId}";
-                sb.AppendLine($"{noteId}[\"{MermaidUtils.EscapeText(h.Evidencia)}\"]:::note");
+                sb.AppendLine($"{noteId}[\"{MermaidUtils.Escapar(h.Evidencia)}\"]:::note");
                 sb.AppendLine($"{noteId} -.-> {supId}");
             }
         }

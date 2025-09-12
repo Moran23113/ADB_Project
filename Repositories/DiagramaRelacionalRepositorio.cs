@@ -43,7 +43,7 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
             fkPorTabla.TryGetValue(tabla, out var columnasFk);
             columnasFk ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            sb.AppendLine($"  {MermaidUtils.SanitizeId(tabla)} {{");
+            sb.AppendLine($"  {MermaidUtils.Sanitizar(tabla)} {{");
             foreach (var columna in esquema.Columnas.Where(c => c.Tabla == tabla))
             {
                 var tipo = MapearTipo(columna.Tipo);
@@ -52,7 +52,7 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
                 if (columnasFk.Contains(columna.Nombre)) flags.Add("FK");
                 if (columna.EsUnicoCandidato && !columna.EsPk) flags.Add("UK");
                 var sufijo = flags.Count > 0 ? " " + string.Join(" ", flags) : string.Empty;
-                sb.AppendLine($"    {MermaidUtils.EscapeText(tipo)} {MermaidUtils.EscapeText(columna.Nombre)}{sufijo}");
+                sb.AppendLine($"    {MermaidUtils.Escapar(tipo)} {MermaidUtils.Escapar(columna.Nombre)}{sufijo}");
             }
             sb.AppendLine("  }");
         }
@@ -66,7 +66,7 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
                 ? (fk.HijaTodasNoNulas ? "||" : "o|")
                 : (fk.HijaTodasNoNulas ? "|{" : "o{");
 
-            sb.AppendLine($"  {MermaidUtils.SanitizeId(fk.TablaPadre)} {padre}--{hija} {MermaidUtils.SanitizeId(fk.TablaHija)} : \"{MermaidUtils.EscapeText(fk.Nombre)}\"");
+            sb.AppendLine($"  {MermaidUtils.Sanitizar(fk.TablaPadre)} {padre}--{hija} {MermaidUtils.Sanitizar(fk.TablaHija)} : \"{MermaidUtils.Escapar(fk.Nombre)}\"");
         }
 
         return sb.ToString();

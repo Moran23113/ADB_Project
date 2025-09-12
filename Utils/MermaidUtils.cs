@@ -8,12 +8,8 @@ public static class MermaidUtils
     // Regex para sanear identificadores Mermaid.
     private static readonly Regex _idBad = new("[^A-Za-z0-9_]", RegexOptions.Compiled);
 
-    /// <summary>
-    /// Sanitiza un identificador para que sea válido en Mermaid.
-    /// Reemplaza caracteres no permitidos, asegura inicio con letra
-    /// y limita su longitud a 60 caracteres.
-    /// </summary>
-    public static string SanitizeId(string? id)
+  
+    public static string Sanitizar(string? id)
     {
         var s = id ?? "X";
         s = _idBad.Replace(s, "_");
@@ -23,11 +19,8 @@ public static class MermaidUtils
         return s;
     }
 
-    /// <summary>
-    /// Escapa texto para que no rompa el parser de Mermaid.
-    /// Maneja caracteres problemáticos comunes y entidades HTML.
-    /// </summary>
-    public static string EscapeText(string? txt)
+ 
+    public static string Escapar(string? txt)
     {
         if (string.IsNullOrEmpty(txt)) return "";
         return txt

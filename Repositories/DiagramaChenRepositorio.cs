@@ -38,13 +38,13 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
             if (TablasIgnoradas.Contains(tabla.Nombre)) continue;
             if (esquema.TablasUnionMuchosAMuchos.Contains(tabla.Nombre)) continue;
 
-            var idEntidad = MermaidUtils.SanitizeId(tabla.Nombre);
-            sb.AppendLine($"  {idEntidad}[{MermaidUtils.EscapeText(tabla.Nombre)}]:::entidad");
+            var idEntidad = MermaidUtils.Sanitizar(tabla.Nombre);
+            sb.AppendLine($"  {idEntidad}[{MermaidUtils.Escapar(tabla.Nombre)}]:::entidad");
 
             foreach (var columna in esquema.Columnas.Where(x => x.Tabla == tabla.Nombre))
             {
-                var idAtributo = $"{idEntidad}__{MermaidUtils.SanitizeId(columna.Nombre)}";
-                sb.AppendLine($"  {idAtributo}(({MermaidUtils.EscapeText(columna.Nombre)})):::atributo");
+                var idAtributo = $"{idEntidad}__{MermaidUtils.Sanitizar(columna.Nombre)}";
+                sb.AppendLine($"  {idAtributo}(({MermaidUtils.Escapar(columna.Nombre)})):::atributo");
 
                 if (columna.EsPk) sb.AppendLine($"  class {idAtributo} clave;");
                 else if (columna.EsUnicoCandidato) sb.AppendLine($"  class {idAtributo} unico;");
@@ -62,18 +62,18 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
             if (TablasIgnoradas.Contains(relacion.TablaPadre) || TablasIgnoradas.Contains(relacion.TablaHija)) continue;
             if (esquema.TablasUnionMuchosAMuchos.Contains(relacion.TablaHija)) continue;
 
-            var idRelacion = $"REL_{contador++}_{MermaidUtils.SanitizeId(relacion.Nombre)}";
-            sb.AppendLine($"  {idRelacion}{{{{{MermaidUtils.EscapeText(relacion.Nombre)}}}}}:::relacion");
-            sb.AppendLine($"  {MermaidUtils.SanitizeId(relacion.TablaPadre)} -- \"1\" --> {idRelacion}");
+            var idRelacion = $"REL_{contador++}_{MermaidUtils.Sanitizar(relacion.Nombre)}";
+            sb.AppendLine($"  {idRelacion}{{{{{MermaidUtils.Escapar(relacion.Nombre)}}}}}:::relacion");
+            sb.AppendLine($"  {MermaidUtils.Sanitizar(relacion.TablaPadre)} -- \"1\" --> {idRelacion}");
 
             string multiplicidad = relacion.HijaEsUnica
                 ? (relacion.HijaTodasNoNulas ? "1" : "0..1")
                 : (relacion.HijaTodasNoNulas ? "1..N" : "0..N");
 
             if (relacion.HijaTodasNoNulas)
-                sb.AppendLine($"  {idRelacion} -- \"{multiplicidad}\" --> {MermaidUtils.SanitizeId(relacion.TablaHija)}");
+                sb.AppendLine($"  {idRelacion} -- \"{multiplicidad}\" --> {MermaidUtils.Sanitizar(relacion.TablaHija)}");
             else
-                sb.AppendLine($"  {idRelacion} -. \"{multiplicidad}\" .-> {MermaidUtils.SanitizeId(relacion.TablaHija)}");
+                sb.AppendLine($"  {idRelacion} -. \"{multiplicidad}\" .-> {MermaidUtils.Sanitizar(relacion.TablaHija)}");
         }
     }
 
@@ -91,11 +91,11 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
 
             if (padres.Count == 2)
             {
-                var idRelacion = $"MN_{MermaidUtils.SanitizeId(tablaPuente)}";
-                sb.AppendLine($"  {idRelacion}{{{{{MermaidUtils.EscapeText(tablaPuente)}}}}}:::relacion");
+                var idRelacion = $"MN_{MermaidUtils.Sanitizar(tablaPuente)}";
+                sb.AppendLine($"  {idRelacion}{{{{{MermaidUtils.Escapar(tablaPuente)}}}}}:::relacion");
 
-                sb.AppendLine($"  {MermaidUtils.SanitizeId(padres[0])} -- \"1..N\" --> {idRelacion}");
-                sb.AppendLine($"  {idRelacion} -- \"1..N\" --> {MermaidUtils.SanitizeId(padres[1])}");
+                sb.AppendLine($"  {MermaidUtils.Sanitizar(padres[0])} -- \"1..N\" --> {idRelacion}");
+                sb.AppendLine($"  {idRelacion} -- \"1..N\" --> {MermaidUtils.Sanitizar(padres[1])}");
 
                 var columnasFk = new HashSet<string>(
                     esquema.LlavesForaneas.Where(f => f.TablaHija == tablaPuente)
@@ -105,8 +105,8 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
                 var atributosRelacion = esquema.Columnas.Where(c => c.Tabla == tablaPuente && !columnasFk.Contains(c.Nombre));
                 foreach (var columna in atributosRelacion)
                 {
-                    var idAtributo = $"{MermaidUtils.SanitizeId(tablaPuente)}__{MermaidUtils.SanitizeId(columna.Nombre)}";
-                    sb.AppendLine($"  {idAtributo}(({MermaidUtils.EscapeText(columna.Nombre)})):::atributo");
+                    var idAtributo = $"{MermaidUtils.Sanitizar(tablaPuente)}__{MermaidUtils.Sanitizar(columna.Nombre)}";
+                    sb.AppendLine($"  {idAtributo}(({MermaidUtils.Escapar(columna.Nombre)})):::atributo");
                     if (columna.EsPk) sb.AppendLine($"  class {idAtributo} clave;");
                     sb.AppendLine($"  {idAtributo} --- {idRelacion}");
                 }
