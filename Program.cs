@@ -4,9 +4,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<IRestauracionRepositorio, RestauracionRepositorio>();
 builder.Services.AddSingleton<IEsquemaRepositorio, EsquemaRepositorio>();
-builder.Services.AddSingleton<ConstructorDiagramaChen>();
-builder.Services.AddSingleton<ConstructorDiagramaRelacional>();
-builder.Services.AddSingleton<ITraductorRelacional, TraductorRelacional>();
+builder.Services.AddSingleton<IDiagramaChenRepositorio, DiagramaChenRepositorio>();
+builder.Services.AddSingleton<IDiagramaRelacionalRepositorio, DiagramaRelacionalRepositorio>();
+builder.Services.AddSingleton<ITraductorRepositorio, TraductorRepositorio>();
 
 var app = builder.Build();
 

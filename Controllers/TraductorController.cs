@@ -4,11 +4,11 @@ namespace TuProyecto.Controllers
 {
     public class TraductorController : Controller
     {
-        private readonly ITraductorRelacional traductor;
+        private readonly ITraductorRepositorio _traductor;
 
-        public TraductorController(ITraductorRelacional traductor)
+        public TraductorController(ITraductorRepositorio traductor)
         {
-            this.traductor = traductor;
+            _traductor = traductor;
         }
 
         [HttpGet]
@@ -21,8 +21,8 @@ namespace TuProyecto.Controllers
         public IActionResult Traducir(string modo, string texto)
         {
             string resultado = modo == "AR2SQL"
-                ? traductor.AlgebraRelacionalASql(texto)
-                : traductor.SqlAAlgebraRelacional(texto);
+                ? _traductor.AlgebraRelacionalASql(texto)
+                : _traductor.SqlAAlgebraRelacional(texto);
 
             ViewBag.Resultado = resultado;
             ViewBag.Texto = texto;

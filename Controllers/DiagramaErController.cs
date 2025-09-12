@@ -9,7 +9,7 @@ public class DiagramaErController : Controller
     private readonly IConfiguration _cfg;
     private readonly IRestauracionRepositorio _restaurador;
     private readonly IEsquemaRepositorio _lector;
-    private readonly ConstructorDiagramaChen _constructor;
+    private readonly IDiagramaChenRepositorio _diagramaChen;
 
 
  
@@ -18,13 +18,13 @@ public class DiagramaErController : Controller
         IConfiguration cfg,
         IRestauracionRepositorio restaurador,
         IEsquemaRepositorio lector,
-        ConstructorDiagramaChen constructor)
+        IDiagramaChenRepositorio diagramaChen)
     {
         _entorno = entorno;
         _cfg = cfg;
         _restaurador = restaurador;
         _lector = lector;
-        _constructor = constructor;
+        _diagramaChen = diagramaChen;
     }
 
    
@@ -66,7 +66,7 @@ public class DiagramaErController : Controller
 
             // 3) ER (Chen): generar Mermaid del modelo relacional.
             ViewBag.NombreBD = nombreBD;
-            ViewBag.Mermaid = _constructor.Construir(snap);
+            ViewBag.Mermaid = _diagramaChen.Construir(snap);
 
             // 4) EER: detectar jerarquías de subtipos mediante heurística PK=FK (FK UNIQUE).
             var jerarquias = InferenciaEER.DetectarJerarquias(snap);
@@ -157,7 +157,7 @@ public class DiagramaErController : Controller
             var snap = _lector.Leer(NombreBD);
 
             ViewBag.NombreBD = NombreBD;
-            ViewBag.Mermaid = _constructor.Construir(snap);
+            ViewBag.Mermaid = _diagramaChen.Construir(snap);
 
             var jerarquias = InferenciaEER.DetectarJerarquias(snap);
             await AplicarEleccionesAsync(NombreBD, jerarquias);

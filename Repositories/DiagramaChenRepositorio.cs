@@ -3,7 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-public class ConstructorDiagramaChen
+public interface IDiagramaChenRepositorio
+{
+    string Construir(InstantaneaEsquema esquema);
+}
+
+public class DiagramaChenRepositorio : IDiagramaChenRepositorio
 {
     private static readonly HashSet<string> TablasIgnoradas =
         new(StringComparer.OrdinalIgnoreCase) { "EER_UserChoices" };

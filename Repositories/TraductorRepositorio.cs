@@ -1,12 +1,12 @@
 using System.Text.RegularExpressions;
 
-public interface ITraductorRelacional
+public interface ITraductorRepositorio
 {
     string AlgebraRelacionalASql(string entrada);
     string SqlAAlgebraRelacional(string entrada);
 }
 
-public class TraductorRelacional : ITraductorRelacional
+public class TraductorRepositorio : ITraductorRepositorio
 {
     private static readonly Regex Seleccion = new(@"σ_\{(.+)\}\((.+)\)", RegexOptions.Compiled);
     private static readonly Regex Proyeccion = new(@"π_\{(.+)\}\((.+)\)", RegexOptions.Compiled);

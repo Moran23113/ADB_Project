@@ -4,7 +4,12 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 
-public class ConstructorDiagramaRelacional
+public interface IDiagramaRelacionalRepositorio
+{
+    string Construir(InstantaneaEsquema esquema);
+}
+
+public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
 {
     private static readonly Regex IdentificadorInvalido =
         new(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
