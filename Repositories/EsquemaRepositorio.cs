@@ -23,7 +23,6 @@ public class InstantaneaEsquema
     public List<InfoColumna> Columnas { get; } = new();
     public List<InfoLlaveForanea> LlavesForaneas { get; } = new();
     public HashSet<string> TablasUnionMuchosAMuchos { get; } = new();
-    public HashSet<string> EntidadesDebiles { get; } = new();
 }
 
 public interface IEsquemaRepositorio
@@ -90,7 +89,6 @@ public class EsquemaRepositorio : IEsquemaRepositorio
     {
         int cantidadFks = 0;
         var tablasReferenciadas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        bool fkEnPk = false;
         var columnasPk = tabla.Indexes.Cast<SmoIndex>()
             .FirstOrDefault(i => i.IndexKeyType == IndexKeyType.DriPrimaryKey)?
             .IndexedColumns.Cast<SmoIndexedColumn>()
@@ -108,8 +106,6 @@ public class EsquemaRepositorio : IEsquemaRepositorio
             {
                 colsPadre.Add(columnaFk.ReferencedColumn);
                 colsHija.Add(columnaFk.Name);
-                if (columnasPk.Contains(columnaFk.Name))
-                    fkEnPk = true;
             }
 
             bool hijaUnica = tabla.Indexes.Cast<SmoIndex>().Any(i =>
@@ -131,8 +127,5 @@ public class EsquemaRepositorio : IEsquemaRepositorio
 
         if (columnasPk.Count == 2 && cantidadFks >= 2 && tablasReferenciadas.Count == 2)
             esquema.TablasUnionMuchosAMuchos.Add(tabla.Name);
-
-        if (fkEnPk)
-            esquema.EntidadesDebiles.Add(tabla.Name);
     }
 }
