@@ -1,115 +1,98 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Data;
 
-/// <summary>
-/// Servicio para restaurar y eliminar bases de datos SQL Server a partir de un archivo .bak.
-/// - Usa una cadena de conexión "maestra" (por ejemplo, a master) para ejecutar RESTORE/DROP.
-/// - Genera un nombre aleatorio para la BD restaurada con un prefijo configurable.
-/// </summary>
 public class ServicioRestauracionSql
 {
-    private readonly string _cnnMaestra;
+    private readonly string cadenaMaestra;
 
-    /// <summary>
-    /// Crea el servicio leyendo la cadena de conexión "SqlMaestra" (appsettings.json / secretos).
-    /// </summary>
-    public ServicioRestauracionSql(IConfiguration cfg)
+    public ServicioRestauracionSql(IConfiguration configuracion)
     {
-        _cnnMaestra = cfg.GetConnectionString("SqlMaestra")!;
+        cadenaMaestra = configuracion.GetConnectionString("SqlMaestra")!;
     }
 
-    public async Task<string> RestaurarAsync(string rutaBak, string prefijoNombre = "ER")
+    public async Task<string> RestaurarAsync(string rutaBackup, string prefijo = "ER")
     {
-        // Genera un nombre único y “amigable” (sin guiones, mayúsculas).
-        var nombreBD = $"{prefijoNombre}_{Guid.NewGuid():N}".ToUpper();
+        string nombreBd = $"{prefijo}_{Guid.NewGuid():N}".ToUpper();
 
-        using var cn = new SqlConnection(_cnnMaestra);
-        await cn.OpenAsync();
-
-        // 1) Obtener rutas por defecto (data y log) del instance
-        string rutaDatos, rutaLog;
-        using (var cmd = cn.CreateCommand())
+        try
         {
-            cmd.CommandText = @"
-SELECT CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000)),
-       CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(4000));";
-            using var rd = await cmd.ExecuteReaderAsync();
-            rd.Read(); // serverproperty devuelve una fila
-            rutaDatos = rd.GetString(0);
-            rutaLog = rd.GetString(1);
+            using var conexion = new SqlConnection(cadenaMaestra);
+            await conexion.OpenAsync();
+
+            var rutas = await ObtenerRutasPorDefectoAsync(conexion);
+            var nombresLogicos = await ObtenerNombresLogicosAsync(conexion, rutaBackup);
+
+            string rutaMdf = Path.Combine(rutas.rutaDatos, $"{nombreBd}.mdf");
+            string rutaLdf = Path.Combine(rutas.rutaLogs, $"{nombreBd}_log.ldf");
+
+            await EjecutarRestoreAsync(
+                conexion, nombreBd, rutaBackup,
+                nombresLogicos.logicoDatos, nombresLogicos.logicoLog,
+                rutaMdf, rutaLdf);
+        }
+        catch (SqlException ex)
+        {
+            throw new InvalidOperationException("Error al restaurar la base de datos.", ex);
         }
 
-        // 2) Leer nombres lógicos de los archivos dentro del .bak
-        var archivos = new List<(string Logico, string Tipo)>();
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "RESTORE FILELISTONLY FROM DISK = @p";
-            cmd.Parameters.Add(new SqlParameter("@p", SqlDbType.NVarChar, 4000) { Value = rutaBak });
-            using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-            {
-                // Type: 'D' = data, 'L' = log (puede haber múltiples).
-                archivos.Add((rd["LogicalName"].ToString()!, rd["Type"].ToString()!));
-            }
-        }
-        if (archivos.Count == 0)
-            throw new Exception("El archivo .bak no contiene archivos o es incompatible.");
+        return nombreBd;
+    }
 
-        // Seleccionar un archivo lógico de datos y uno de log (asumiendo estructura típica 1D/1L)
-        var logicoDatos = archivos.First(a => a.Tipo == "D").Logico;
-        var logicoLog = archivos.First(a => a.Tipo == "L").Logico;
+    private static async Task<(string rutaDatos, string rutaLogs)> ObtenerRutasPorDefectoAsync(SqlConnection conexion)
+    {
+        using var comando = conexion.CreateCommand();
+        comando.CommandText = @"SELECT CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000)),
+                                       CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(4000));";
+        using var lector = await comando.ExecuteReaderAsync();
+        lector.Read();
+        return (lector.GetString(0), lector.GetString(1));
+    }
 
-        // 3) Construir rutas físicas destino (.mdf/.ldf) en las carpetas por defecto del instance
-        var fisicoDatos = Path.Combine(rutaDatos, $"{nombreBD}.mdf");
-        var fisicoLog = Path.Combine(rutaLog, $"{nombreBD}_log.ldf");
+    private static async Task<(string logicoDatos, string logicoLog)> ObtenerNombresLogicosAsync(SqlConnection conexion, string rutaBackup)
+    {
+        var archivos = new List<(string nombre, string tipo)>();
+        using var comando = conexion.CreateCommand();
+        comando.CommandText = "RESTORE FILELISTONLY FROM DISK = @ruta";
+        comando.Parameters.Add(new SqlParameter("@ruta", SqlDbType.NVarChar, 4000) { Value = rutaBackup });
+        using var lector = await comando.ExecuteReaderAsync();
+        while (await lector.ReadAsync())
+            archivos.Add((lector["LogicalName"].ToString()!, lector["Type"].ToString()!));
 
-        // 4) Restaurar la base con MOVE + REPLACE + RECOVERY
-        using (var cmd = cn.CreateCommand())
-        {
-            // Para restores grandes, sin límite de tiempo
-            cmd.CommandTimeout = 0;
+        string archivoDatos = archivos.First(a => a.tipo == "D").nombre;
+        string archivoLog = archivos.First(a => a.tipo == "L").nombre;
+        return (archivoDatos, archivoLog);
+    }
 
-            // Nota: Se parametriza el DISK y los nombres lógicos/físicos.
-            // Los identificadores (nombre de BD) se insertan en el T-SQL (no parametrizable como identificador),
-            // pero el nombre lo generamos nosotros, no proviene del usuario.
-            cmd.CommandText = @"
-RESTORE DATABASE [" + nombreBD + @"] FROM DISK = @p
-WITH MOVE @ld TO @d,
-     MOVE @ll TO @l,
+    private static async Task EjecutarRestoreAsync(
+        SqlConnection conexion, string nombreBd, string rutaBackup,
+        string logicoDatos, string logicoLog,
+        string rutaMdf, string rutaLdf)
+    {
+        using var comando = conexion.CreateCommand();
+        comando.CommandTimeout = 0;
+        comando.CommandText = $@"RESTORE DATABASE [{nombreBd}] FROM DISK = @ruta
+WITH MOVE @ld TO @mdf,
+     MOVE @ll TO @ldf,
      REPLACE, RECOVERY, STATS = 5;";
-            cmd.Parameters.AddWithValue("@p", rutaBak);
-            cmd.Parameters.AddWithValue("@ld", logicoDatos);
-            cmd.Parameters.AddWithValue("@ll", logicoLog);
-            cmd.Parameters.AddWithValue("@d", fisicoDatos);
-            cmd.Parameters.AddWithValue("@l", fisicoLog);
-
-            await cmd.ExecuteNonQueryAsync();
-        }
-
-        return nombreBD;
+        comando.Parameters.AddWithValue("@ruta", rutaBackup);
+        comando.Parameters.AddWithValue("@ld", logicoDatos);
+        comando.Parameters.AddWithValue("@ll", logicoLog);
+        comando.Parameters.AddWithValue("@mdf", rutaMdf);
+        comando.Parameters.AddWithValue("@ldf", rutaLdf);
+        await comando.ExecuteNonQueryAsync();
     }
 
-    /// <summary>
-    /// Elimina (DROP) una base de datos del servidor, forzando SINGLE_USER y rollback inmediato.
-    /// </summary>
-    /// <param name="nombreBD">Nombre de la BD a eliminar.</param>
-    public async Task EliminarBaseDatosAsync(string nombreBD)
+    public async Task EliminarBaseDatosAsync(string nombreBd)
     {
-        using var cn = new SqlConnection(_cnnMaestra);
-        await cn.OpenAsync();
-
-        using var cmd = cn.CreateCommand();
-        // Ojo: no se puede parametrizar un identificador (nombre de BD) con @param,
-        // por eso se incrusta. Se recomienda validar el formato o usar QUOTENAME.
-        cmd.CommandText = @"
-IF DB_ID(@db) IS NOT NULL
+        using var conexion = new SqlConnection(cadenaMaestra);
+        await conexion.OpenAsync();
+        using var comando = conexion.CreateCommand();
+        comando.CommandText = $@"IF DB_ID(@nombre) IS NOT NULL
 BEGIN
-  -- Forzar desconexión de sesiones abiertas
-  ALTER DATABASE " + "[" + nombreBD + @"] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-  DROP DATABASE " + "[" + nombreBD + @"]" + @";
+  ALTER DATABASE [{nombreBd}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+  DROP DATABASE [{nombreBd}];
 END";
-        cmd.Parameters.AddWithValue("@db", nombreBD);
-
-        await cmd.ExecuteNonQueryAsync();
+        comando.Parameters.AddWithValue("@nombre", nombreBd);
+        await comando.ExecuteNonQueryAsync();
     }
 }
