@@ -2,15 +2,15 @@
 
 public class RelacionalController : Controller
 {
-    private readonly LectorEsquemaSql _lector;
-    private readonly ConstructorDiagramaRelacional _constructorRel;
+    private readonly IEsquemaRepositorio _lector;
+    private readonly IDiagramaRelacionalRepositorio _diagramaRel;
 
     public RelacionalController(
-        LectorEsquemaSql lector,
-        ConstructorDiagramaRelacional constructorRel)
+        IEsquemaRepositorio lector,
+        IDiagramaRelacionalRepositorio diagramaRel)
     {
         _lector = lector;
-        _constructorRel = constructorRel;
+        _diagramaRel = diagramaRel;
     }
 
     /// <summary>
@@ -28,9 +28,9 @@ public class RelacionalController : Controller
 
         try
         {
-            var snap = _lector.Leer(nombreBD);
+            var esquema = _lector.Leer(nombreBD);
             ViewBag.NombreBD = nombreBD;
-            ViewBag.MermaidRel = _constructorRel.Construir(snap);
+            ViewBag.MermaidRel = _diagramaRel.Construir(esquema);
             return View();
         }
         catch (Exception ex)
