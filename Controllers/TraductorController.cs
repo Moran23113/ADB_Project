@@ -18,14 +18,14 @@ namespace TuProyecto.Controllers
         }
 
         [HttpPost]
-        public IActionResult Traducir(string modo, string textoEntrada)
+        public IActionResult Traducir(string modo, string texto)
         {
             string resultado = modo == "AR2SQL"
-                ? _repositorioTraductor.AlgebraRelacionalASql(textoEntrada)
-                : _repositorioTraductor.SqlAAlgebraRelacional(textoEntrada);
+                ? _repositorioTraductor.AlgebraRelacionalASql(texto)
+                : _repositorioTraductor.SqlAAlgebraRelacional(texto);
 
             ViewBag.Resultado = resultado;
-            ViewBag.Texto = textoEntrada;
+            ViewBag.Texto = texto;
             ViewBag.Modo = modo;
             return View("Index");
         }

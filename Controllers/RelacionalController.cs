@@ -14,9 +14,9 @@ public class RelacionalController : Controller
     }
 
     [HttpGet]
-    public IActionResult ModeloR(string nombreBaseDatos)
+    public IActionResult ModeloR(string nombreBD)
     {
-        if (string.IsNullOrWhiteSpace(nombreBaseDatos))
+        if (string.IsNullOrWhiteSpace(nombreBD))
         {
             TempData["msg"] = "Falta el nombre de la base restaurada.";
             return RedirectToAction("Subir", "DiagramaEr");
@@ -24,8 +24,8 @@ public class RelacionalController : Controller
 
         try
         {
-            var esquema = _repositorioEsquema.Leer(nombreBaseDatos);
-            ViewBag.NombreBD = nombreBaseDatos;
+            var esquema = _repositorioEsquema.Leer(nombreBD);
+            ViewBag.NombreBD = nombreBD;
             ViewBag.ModeloRelacional = _repositorioModeloRelacional.Construir(esquema);
             return View();
         }
