@@ -5,10 +5,10 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<IRestauracionRepositorio, RestauracionRepositorio>();
 builder.Services.AddSingleton<IEsquemaRepositorio, EsquemaRepositorio>();
 builder.Services.AddSingleton<IDiagramaChenRepositorio, DiagramaChenRepositorio>();
-builder.Services.AddSingleton<IDiagramaRelacionalRepositorio, DiagramaRelacionalRepositorio>();
 builder.Services.AddSingleton<ITraductorRepositorio, TraductorRepositorio>();
 builder.Services.AddSingleton<IGeneralizacionEerRepositorio, GeneralizacionEerRepositorio>();
 builder.Services.AddSingleton<IGeneralizacionEerService, GeneralizacionEerService>();
+builder.Services.AddSingleton<IModeloRelacionalTextoRepositorio, ModeloRelacionalTextoRepositorio>();
 
 var app = builder.Build();
 

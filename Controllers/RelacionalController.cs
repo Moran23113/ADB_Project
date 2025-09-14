@@ -3,14 +3,14 @@
 public class RelacionalController : Controller
 {
     private readonly IEsquemaRepositorio _lector;
-    private readonly IDiagramaRelacionalRepositorio _diagramaRel;
+    private readonly IModeloRelacionalTextoRepositorio _modeloRel;
 
     public RelacionalController(
         IEsquemaRepositorio lector,
-        IDiagramaRelacionalRepositorio diagramaRel)
+        IModeloRelacionalTextoRepositorio modeloRel)
     {
         _lector = lector;
-        _diagramaRel = diagramaRel;
+        _modeloRel = modeloRel;
     }
 
     
@@ -18,7 +18,7 @@ public class RelacionalController : Controller
     
     
     [HttpGet]
-    public IActionResult ModeloR(string nombreBD, bool texto = true)
+    public IActionResult ModeloR(string nombreBD)
     {
         if (string.IsNullOrWhiteSpace(nombreBD))
         {
@@ -30,15 +30,12 @@ public class RelacionalController : Controller
         {
             var esquema = _lector.Leer(nombreBD);
             ViewBag.NombreBD = nombreBD;
-            ViewBag.EsTexto = texto;
-            ViewBag.ModeloRelacional = texto
-                ? VistaRelacionalTexto.Construir(esquema)
-                : _diagramaRel.Construir(esquema);
+            ViewBag.ModeloRelacional = _modeloRel.Construir(esquema);
             return View();
         }
         catch (Exception ex)
         {
-            TempData["msg"] = "Error generando diagrama relacional: " + ex.Message;
+            TempData["msg"] = "Error generando modelo relacional: " + ex.Message;
             return RedirectToAction("Subir", "DiagramaEr");
         }
     }

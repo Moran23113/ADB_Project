@@ -1,6 +1,5 @@
 @{
-    var esTexto = (bool)(ViewBag.EsTexto ?? false);
-    ViewData["Title"] = esTexto ? "Modelo Relacional (Texto)" : "Modelo Relacional (Mermaid erDiagram)";
+    ViewData["Title"] = "Modelo Relacional";
     var nombreBD = (string)ViewBag.NombreBD;
     var modelo = (string)ViewBag.ModeloRelacional;
 }
@@ -14,14 +13,6 @@
             <input type="hidden" name="nombreBD" value="@nombreBD" />
             <button class="btn btn-outline-danger">Eliminar BD</button>
         </form>
-        @if (esTexto)
-        {
-            <a class="btn btn-primary" asp-action="ModeloR" asp-route-nombreBD="@nombreBD" asp-route-texto="false">Ver diagrama</a>
-        }
-        else
-        {
-            <a class="btn btn-primary" asp-action="ModeloR" asp-route-nombreBD="@nombreBD" asp-route-texto="true">Ver texto</a>
-        }
     </div>
 </div>
 
@@ -30,34 +21,4 @@
     <div class="alert alert-info">@TempData["msg"]</div>
 }
 
-@if (esTexto)
-{
-    <pre>@modelo</pre>
-}
-else
-{
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script>
-        mermaid.initialize({
-          startOnLoad: true,
-          securityLevel: 'loose',
-          maxTextSize: 10000000
-        });
-    </script>
-
-    <pre class="mermaid">
-@modelo
-    </pre>
-
-    <details class="mt-3">
-        <summary>Ver código Mermaid (depuración)</summary>
-        <textarea style="width:100%;height:260px" readonly>
-@Html.Raw(System.Net.WebUtility.HtmlEncode(modelo))
-        </textarea>
-    </details>
-}
-
-<form asp-action="ExportarSql" method="post" class="mt-3">
-    <input type="hidden" name="nombreBD" value="@nombreBD" />
-    <button class="btn btn-success">Exportar SQL</button>
-</form>
+<pre>@modelo</pre>
