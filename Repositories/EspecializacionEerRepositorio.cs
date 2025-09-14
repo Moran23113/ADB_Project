@@ -1,4 +1,6 @@
 using Microsoft.Data.SqlClient;
+using Microsoft.SqlServer.Management.Common;
+using Microsoft.SqlServer.Management.Smo;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -16,12 +18,14 @@ public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
         using var cn = new SqlConnection(conexion);
         cn.Open();
 
-        var columnaPk = ObtenerColumnaPk(cn, entidadPadre);
+        var servidor = new Server(new ServerConnection(cn));
+        var bd = servidor.Databases[cn.Database];
+        var columnaPk = ObtenerColumnaPk(bd, entidadPadre);
 
         var selects = new List<string>();
         foreach (var hija in entidadesHija)
         {
-            var columnaFk = ObtenerColumnaFk(cn, hija, entidadPadre);
+            var columnaFk = ObtenerColumnaFk(bd, hija, entidadPadre);
             selects.Add($"SELECT {columnaFk} AS IdPadre FROM {hija}");
         }
 
@@ -45,14 +49,16 @@ public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
     {
         using var cn = new SqlConnection(conexion);
         cn.Open();
+        var servidor = new Server(new ServerConnection(cn));
+        var bd = servidor.Databases[cn.Database];
         int total = 0;
 
         for (int i = 0; i < entidadesHija.Length; i++)
         {
             for (int j = i + 1; j < entidadesHija.Length; j++)
             {
-                var fk1 = ObtenerColumnaFk(cn, entidadesHija[i], entidadPadre);
-                var fk2 = ObtenerColumnaFk(cn, entidadesHija[j], entidadPadre);
+                var fk1 = ObtenerColumnaFk(bd, entidadesHija[i], entidadPadre);
+                var fk2 = ObtenerColumnaFk(bd, entidadesHija[j], entidadPadre);
 
                 var sql = $@"
                     SELECT COUNT(*)
@@ -67,40 +73,19 @@ public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
         return total;
     }
 
-    private static string ObtenerColumnaPk(SqlConnection cn, string tabla)
+    private static string ObtenerColumnaPk(Database bd, string tabla)
     {
-        var sql = @"
-            SELECT c.name
-            FROM sys.key_constraints kc
-            JOIN sys.index_columns ic
-              ON kc.parent_object_id = ic.object_id
-             AND kc.unique_index_id = ic.index_id
-            JOIN sys.columns c
-              ON ic.object_id = c.object_id
-             AND ic.column_id = c.column_id
-            WHERE kc.type = 'PK' AND OBJECT_NAME(kc.parent_object_id) = @tabla";
-
-        using var cmd = new SqlCommand(sql, cn);
-        cmd.Parameters.AddWithValue("@tabla", tabla);
-        return (string)cmd.ExecuteScalar()!;
+        var t = bd.Tables[tabla];
+        var pk = t.Indexes.Cast<Microsoft.SqlServer.Management.Smo.Index>()
+                          .First(i => i.IndexKeyType == IndexKeyType.DriPrimaryKey);
+        return pk.IndexedColumns[0].Name;
     }
 
-    private static string ObtenerColumnaFk(SqlConnection cn, string tablaHija, string tablaPadre)
+    private static string ObtenerColumnaFk(Database bd, string tablaHija, string tablaPadre)
     {
-        var sql = @"
-            SELECT cc.name
-            FROM sys.foreign_key_columns fkc
-            JOIN sys.tables tp ON fkc.referenced_object_id = tp.object_id
-            JOIN sys.tables tc ON fkc.parent_object_id = tc.object_id
-            JOIN sys.columns cc
-              ON fkc.parent_object_id = cc.object_id
-             AND fkc.parent_column_id = cc.column_id
-            WHERE tp.name = @padre AND tc.name = @hija";
-
-        using var cmd = new SqlCommand(sql, cn);
-        cmd.Parameters.AddWithValue("@padre", tablaPadre);
-        cmd.Parameters.AddWithValue("@hija", tablaHija);
-        return (string)cmd.ExecuteScalar()!;
+        var t = bd.Tables[tablaHija];
+        var fk = t.ForeignKeys.Cast<ForeignKey>()
+                              .First(f => f.ReferencedTable == tablaPadre);
+        return fk.Columns[0].Name;
     }
 }
-
