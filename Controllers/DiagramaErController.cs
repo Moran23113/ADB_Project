@@ -4,27 +4,27 @@ using System.Linq;
 
 public class DiagramaErController : Controller
 {
-    private readonly IWebHostEnvironment _entorno;
-    private readonly IConfiguration _cfg;
-    private readonly IRestauracionRepositorio _restaurador;
-    private readonly IEsquemaRepositorio _lector;
-    private readonly IDiagramaChenRepositorio _diagramaChen;
-    private readonly IEspecializacionEerService _especializacionService;
+    private readonly IWebHostEnvironment _entornoWeb;
+    private readonly IConfiguration _configuracion;
+    private readonly IRestauracionRepositorio _repositorioRestauracion;
+    private readonly IEsquemaRepositorio _repositorioEsquema;
+    private readonly IDiagramaChenRepositorio _repositorioDiagramaChen;
+    private readonly IEspecializacionEerService _servicioEspecializacion;
 
     public DiagramaErController(
-        IWebHostEnvironment entorno,
-        IConfiguration cfg,
-        IRestauracionRepositorio restaurador,
-        IEsquemaRepositorio lector,
-        IDiagramaChenRepositorio diagramaChen,
-        IEspecializacionEerService especializacionService)
+        IWebHostEnvironment entornoWeb,
+        IConfiguration configuracion,
+        IRestauracionRepositorio repositorioRestauracion,
+        IEsquemaRepositorio repositorioEsquema,
+        IDiagramaChenRepositorio repositorioDiagramaChen,
+        IEspecializacionEerService servicioEspecializacion)
     {
-        _entorno = entorno;
-        _cfg = cfg;
-        _restaurador = restaurador;
-        _lector = lector;
-        _diagramaChen = diagramaChen;
-        _especializacionService = especializacionService;
+        _entornoWeb = entornoWeb;
+        _configuracion = configuracion;
+        _repositorioRestauracion = repositorioRestauracion;
+        _repositorioEsquema = repositorioEsquema;
+        _repositorioDiagramaChen = repositorioDiagramaChen;
+        _servicioEspecializacion = servicioEspecializacion;
     }
 
     [HttpGet]
@@ -32,48 +32,50 @@ public class DiagramaErController : Controller
 
     [HttpPost]
     [RequestSizeLimit(1_000_000_000)]
-    public async Task<IActionResult> Subir(IFormFile archivoBak)
+    public async Task<IActionResult> Subir(IFormFile archivoRespaldo)
     {
-        if (archivoBak == null || archivoBak.Length == 0)
+        if (archivoRespaldo == null || archivoRespaldo.Length == 0)
         {
             ModelState.AddModelError("", "Sube un archivo .bak");
             return View();
         }
 
-        var carpeta = _cfg["Upload:Carpeta"] ?? "App_Data/Uploads";
-        var raiz = Path.Combine(_entorno.ContentRootPath, carpeta);
-        Directory.CreateDirectory(raiz);
+        var carpetaSubida = _configuracion["Upload:Carpeta"] ?? "App_Data/Uploads";
+        var rutaCarpetaSubida = Path.Combine(_entornoWeb.ContentRootPath, carpetaSubida);
+        Directory.CreateDirectory(rutaCarpetaSubida);
 
-        var rutaBak = Path.Combine(raiz, $"{Guid.NewGuid():N}.bak");
+        var rutaRespaldo = Path.Combine(rutaCarpetaSubida, $"{Guid.NewGuid():N}.bak");
 
-        using (var fs = System.IO.File.Create(rutaBak))
-            await archivoBak.CopyToAsync(fs);
+        using (var archivo = System.IO.File.Create(rutaRespaldo))
+            await archivoRespaldo.CopyToAsync(archivo);
 
-        string nombreBD = "";
+        string nombreBaseRestaurada = string.Empty;
         try
         {
-            nombreBD = await _restaurador.RestaurarAsync(rutaBak, "ER");
+            nombreBaseRestaurada = await _repositorioRestauracion.RestaurarAsync(rutaRespaldo, "ER");
 
-            var esquema = _lector.Leer(nombreBD);
+            var esquema = _repositorioEsquema.Leer(nombreBaseRestaurada);
 
-            ViewBag.NombreBD = nombreBD;
-            ViewBag.Mermaid = _diagramaChen.Construir(esquema);
+            ViewBag.NombreBD = nombreBaseRestaurada;
+            ViewBag.Mermaid = _repositorioDiagramaChen.Construir(esquema);
 
             var jerarquias = InferenciaEER.DetectarJerarquias(esquema);
 
-            var csb = new SqlConnectionStringBuilder(_cfg.GetConnectionString("SqlMaestra"));
-            csb.InitialCatalog = nombreBD;
-            var cnnRestaurada = csb.ToString();
+            var constructorCadena = new SqlConnectionStringBuilder(_configuracion.GetConnectionString("SqlMaestra"))
+            {
+                InitialCatalog = nombreBaseRestaurada
+            };
+            var cadenaConexionRestaurada = constructorCadena.ToString();
 
             foreach (var jerarquia in jerarquias)
             {
-                var info = _especializacionService.AnalizarEspecializacion(
-                    cnnRestaurada,
+                var infoEspecializacion = _servicioEspecializacion.AnalizarEspecializacion(
+                    cadenaConexionRestaurada,
                     jerarquia.Supertipo,
                     jerarquia.Subtipos.ToArray());
 
-                jerarquia.Totalidad = info.EsTotal ? EerTotalness.Total : EerTotalness.Parcial;
-                jerarquia.Disyuncion = info.EsDisjunta ? EerDisjointness.Exclusiva : EerDisjointness.Solapada;
+                jerarquia.Totalidad = infoEspecializacion.EsTotal ? EerTotalness.Total : EerTotalness.Parcial;
+                jerarquia.Disyuncion = infoEspecializacion.EsDisjunta ? EerDisjointness.Exclusiva : EerDisjointness.Solapada;
             }
 
             ViewBag.MermaidEER = InferenciaEER.RenderMermaidEER(jerarquias);
@@ -87,7 +89,7 @@ public class DiagramaErController : Controller
         }
         finally
         {
-            try { System.IO.File.Delete(rutaBak); } catch { }
+            try { System.IO.File.Delete(rutaRespaldo); } catch { }
         }
     }
 
@@ -96,7 +98,7 @@ public class DiagramaErController : Controller
     {
         try
         {
-            await _restaurador.EliminarBaseDatosAsync(nombreBD);
+            await _repositorioRestauracion.EliminarBaseDatosAsync(nombreBD);
             TempData["msg"] = $"BD {nombreBD} eliminada.";
         }
         catch (Exception ex)

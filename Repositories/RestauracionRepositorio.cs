@@ -4,51 +4,51 @@ using Microsoft.SqlServer.Management.Smo;
 
 public interface IRestauracionRepositorio
 {
-    Task<string> RestaurarAsync(string rutaBackup, string prefijo = "ER");
+    Task<string> RestaurarAsync(string rutaRespaldo, string prefijo = "ER");
     Task EliminarBaseDatosAsync(string nombreBd);
 }
 
 public class RestauracionRepositorio : IRestauracionRepositorio
 {
-    private readonly string cadenaMaestra;
+    private readonly string _cadenaConexionMaestra;
 
     public RestauracionRepositorio(IConfiguration configuracion)
     {
-        cadenaMaestra = configuracion.GetConnectionString("SqlMaestra")!;
+        _cadenaConexionMaestra = configuracion.GetConnectionString("SqlMaestra")!;
     }
 
-    public async Task<string> RestaurarAsync(string rutaBackup, string prefijo = "ER")
+    public async Task<string> RestaurarAsync(string rutaRespaldo, string prefijo = "ER")
     {
         string nombreBd = $"{prefijo}_{Guid.NewGuid():N}".ToUpper();
 
         try
         {
-            using var conexion = new SqlConnection(cadenaMaestra);
+            using var conexion = new SqlConnection(_cadenaConexionMaestra);
             await conexion.OpenAsync();
             var servidor = new Server(new ServerConnection(conexion));
 
             string rutaDatos = servidor.DefaultFile;
             string rutaLogs = servidor.DefaultLog;
 
-            var restore = new Restore
+            var restauracion = new Restore
             {
                 Database = nombreBd,
                 Action = RestoreActionType.Database,
                 ReplaceDatabase = true
             };
-            restore.Devices.AddDevice(rutaBackup, DeviceType.File);
+            restauracion.Devices.AddDevice(rutaRespaldo, DeviceType.File);
 
-            var fileList = restore.ReadFileList(servidor);
-            string logicoDatos = fileList.Rows[0]["LogicalName"].ToString()!;
-            string logicoLog = fileList.Rows[1]["LogicalName"].ToString()!;
+            var listaArchivos = restauracion.ReadFileList(servidor);
+            string nombreLogicoDatos = listaArchivos.Rows[0]["LogicalName"].ToString()!;
+            string nombreLogicoLog = listaArchivos.Rows[1]["LogicalName"].ToString()!;
 
             string rutaMdf = Path.Combine(rutaDatos, $"{nombreBd}.mdf");
             string rutaLdf = Path.Combine(rutaLogs, $"{nombreBd}_log.ldf");
 
-            restore.RelocateFiles.Add(new RelocateFile(logicoDatos, rutaMdf));
-            restore.RelocateFiles.Add(new RelocateFile(logicoLog, rutaLdf));
+            restauracion.RelocateFiles.Add(new RelocateFile(nombreLogicoDatos, rutaMdf));
+            restauracion.RelocateFiles.Add(new RelocateFile(nombreLogicoLog, rutaLdf));
 
-            await Task.Run(() => restore.SqlRestore(servidor));
+            await Task.Run(() => restauracion.SqlRestore(servidor));
         }
         catch (SmoException ex)
         {
@@ -60,7 +60,7 @@ public class RestauracionRepositorio : IRestauracionRepositorio
 
     public async Task EliminarBaseDatosAsync(string nombreBd)
     {
-        using var conexion = new SqlConnection(cadenaMaestra);
+        using var conexion = new SqlConnection(_cadenaConexionMaestra);
         await conexion.OpenAsync();
         var servidor = new Server(new ServerConnection(conexion));
         await Task.Run(() => servidor.KillDatabase(nombreBd));

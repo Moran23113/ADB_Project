@@ -2,25 +2,21 @@
 
 public class RelacionalController : Controller
 {
-    private readonly IEsquemaRepositorio _lector;
-    private readonly IModeloRelacionalTextoRepositorio _modeloRel;
+    private readonly IEsquemaRepositorio _repositorioEsquema;
+    private readonly IModeloRelacionalTextoRepositorio _repositorioModeloRelacional;
 
     public RelacionalController(
-        IEsquemaRepositorio lector,
-        IModeloRelacionalTextoRepositorio modeloRel)
+        IEsquemaRepositorio repositorioEsquema,
+        IModeloRelacionalTextoRepositorio repositorioModeloRelacional)
     {
-        _lector = lector;
-        _modeloRel = modeloRel;
+        _repositorioEsquema = repositorioEsquema;
+        _repositorioModeloRelacional = repositorioModeloRelacional;
     }
 
-    
-    
-    
-    
     [HttpGet]
-    public IActionResult ModeloR(string nombreBD)
+    public IActionResult ModeloR(string nombreBaseDatos)
     {
-        if (string.IsNullOrWhiteSpace(nombreBD))
+        if (string.IsNullOrWhiteSpace(nombreBaseDatos))
         {
             TempData["msg"] = "Falta el nombre de la base restaurada.";
             return RedirectToAction("Subir", "DiagramaEr");
@@ -28,9 +24,9 @@ public class RelacionalController : Controller
 
         try
         {
-            var esquema = _lector.Leer(nombreBD);
-            ViewBag.NombreBD = nombreBD;
-            ViewBag.ModeloRelacional = _modeloRel.Construir(esquema);
+            var esquema = _repositorioEsquema.Leer(nombreBaseDatos);
+            ViewBag.NombreBD = nombreBaseDatos;
+            ViewBag.ModeloRelacional = _repositorioModeloRelacional.Construir(esquema);
             return View();
         }
         catch (Exception ex)
