@@ -122,13 +122,13 @@ public static class InferenciaEER
 
             var genId = $"GEN_{k++}_{supId}";
             sb.AppendLine($"{genId}[[especializacion]]:::note");
-            sb.AppendLine($"{genId} --> {supId}");
+            sb.AppendLine($"{supId} --> {genId}");
 
             foreach (var sub in h.Subtipos.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 var subId = MermaidUtils.Sanitizar(sub);
                 sb.AppendLine($"{subId}(\"{MermaidUtils.Escapar(sub)}\"):::sub");
-                sb.AppendLine($"{subId} -->|is a| {genId}");
+                sb.AppendLine($"{genId} --> {subId}");
             }
 
             if (!string.IsNullOrWhiteSpace(h.Evidencia))
