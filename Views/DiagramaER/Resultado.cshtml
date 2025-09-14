@@ -1,15 +1,14 @@
-﻿@using System
+@using System
 @{
     ViewData["Title"] = "Diagrama estilo Chen + EER";
     var mermaid = (string)ViewBag.Mermaid;
     var nombreBD = (string)ViewBag.NombreBD;
     var mermaidEer = ViewBag.MermaidEER as string;
-    var ambiguas = ViewBag.JerarquiasAmbiguas as List<JerarquiaEer>;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h3>Modelo (Chen) de @nombreBD</h3>
-     <div class="d-flex gap-2">
+    <div class="d-flex gap-2">
         <a class="btn btn-outline-primary"
            asp-controller="Relacional"
            asp-action="ModeloR"
@@ -17,11 +16,11 @@
            asp-route-texto="true">
             Ver Modelo Relacional
         </a>
-    <form asp-action="EliminarBase" method="post" onsubmit="return confirm('¿Eliminar la base restaurada?');">
-        <input type="hidden" name="nombreBD" value="@nombreBD" />
-        <button class="btn btn-outline-danger">Eliminar BD</button>
-    </form>
-</div>
+        <form asp-action="EliminarBase" method="post" onsubmit="return confirm('¿Eliminar la base restaurada?');">
+            <input type="hidden" name="nombreBD" value="@nombreBD" />
+            <button class="btn btn-outline-danger">Eliminar BD</button>
+        </form>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
@@ -49,54 +48,7 @@
     <pre class="mermaid">
 @mermaidEer
     </pre>
-}
-
-@if (ambiguas != null && ambiguas.Any())
-{
-    <h4 class="mt-4">Resolver ambigüedades EER</h4>
-    <p class="text-muted">Selecciona Disyunción (Exclusiva/Solapada) y Totalidad (Total/Parcial) para cada jerarquía.</p>
-
-    <form asp-action="GuardarChoices" method="post">
-        <input type="hidden" name="NombreBD" value="@nombreBD" />
-
-        @foreach (var j in ambiguas)
-        {
-            var subsCsv = string.Join(",", j.Subtipos.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-            <div class="border p-3 mb-3">
-                <div><b>Supertipo:</b> @j.Supertipo</div>
-                <div><b>Subtipos:</b> @string.Join(", ", j.Subtipos)</div>
-                @if (!string.IsNullOrWhiteSpace(j.Evidencia))
-                {
-                    <div class="text-muted"><small>@j.Evidencia</small></div>
-                }
-
-                <input type="hidden" name="SubtypesCsv[@j.Supertipo]" value="@subsCsv" />
-
-                <div class="row mt-2">
-                    <div class="col-md-6">
-                        <label class="form-label">Disyunción:</label>
-                        <select name="Disyuncion[@j.Supertipo]" class="form-select">
-                            <option value="Exclusive" selected="selected">Exclusiva (disyunta)</option>
-                            <option value="Overlapping">Solapada (overlapping)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Totalidad:</label>
-                        <select name="Totalidad[@j.Supertipo]" class="form-select">
-                            <option value="Total">Total</option>
-                            <option value="Partial" selected="selected">Parcial</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        }
-
-        <button type="submit" class="btn btn-success">Guardar elecciones</button>
-    </form>
-}
-else
-{
-    <div class="alert alert-secondary mt-4">No hay ambigüedades EER por resolver.</div>
+    <div class="alert alert-secondary mt-4">Generalizaciones inferidas automáticamente.</div>
 }
 
 <details class="mt-3">

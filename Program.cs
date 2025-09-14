@@ -7,6 +7,8 @@ builder.Services.AddSingleton<IEsquemaRepositorio, EsquemaRepositorio>();
 builder.Services.AddSingleton<IDiagramaChenRepositorio, DiagramaChenRepositorio>();
 builder.Services.AddSingleton<IDiagramaRelacionalRepositorio, DiagramaRelacionalRepositorio>();
 builder.Services.AddSingleton<ITraductorRepositorio, TraductorRepositorio>();
+builder.Services.AddSingleton<IGeneralizacionEerRepositorio, GeneralizacionEerRepositorio>();
+builder.Services.AddSingleton<IGeneralizacionEerService, GeneralizacionEerService>();
 
 var app = builder.Build();
 
