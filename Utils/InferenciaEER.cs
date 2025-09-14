@@ -19,7 +19,6 @@ public class JerarquiaEer
     public List<string> Subtipos { get; } = new();
     public EerDisjointness Disyuncion { get; set; } = EerDisjointness.Ambiguous;
     public EerTotalness Totalidad { get; set; } = EerTotalness.Ambiguous;
-    public string? Evidencia { get; set; }
 }
 
 
@@ -75,13 +74,11 @@ public static class InferenciaEER
             {
                 j.Disyuncion = EerDisjointness.Exclusiva;
                 j.Totalidad = EerTotalness.Ambiguous;
-                j.Evidencia = $"Discriminador {disc.Nombre} en {j.Supertipo} (NOT NULL).";
             }
             else
             {
                 j.Disyuncion = j.Subtipos.Count > 1 ? EerDisjointness.Solapada : EerDisjointness.Ambiguous;
                 j.Totalidad = EerTotalness.Ambiguous;
-                j.Evidencia = "Subtipos detectados por patrón PK=FK (FK UNIQUE).";
             }
 
             lista.Add(j);
@@ -131,12 +128,6 @@ public static class InferenciaEER
                 sb.AppendLine($"{genId} --> {subId}");
             }
 
-            if (!string.IsNullOrWhiteSpace(h.Evidencia))
-            {
-                var noteId = $"NOTE_{supId}";
-                sb.AppendLine($"{noteId}[\"{MermaidUtils.Escapar(h.Evidencia)}\"]:::note");
-                sb.AppendLine($"{noteId} -.-> {supId}");
-            }
         }
         return sb.ToString();
     }
