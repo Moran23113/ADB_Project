@@ -32,6 +32,8 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
     public string Construir(InstantaneaEsquema esquema)
     {
         var tablasOcultas = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EER_UserChoices" };
+        bool EsOculta(string t) => tablasOcultas.Contains(t) || t.StartsWith("EER_", StringComparison.OrdinalIgnoreCase);
+
         var sb = new StringBuilder();
         sb.AppendLine("erDiagram");
 
@@ -39,7 +41,7 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
 
         foreach (var tabla in esquema.Tablas.Select(t => t.Nombre))
         {
-            if (tablasOcultas.Contains(tabla)) continue;
+            if (EsOculta(tabla)) continue;
 
             fkPorTabla.TryGetValue(tabla, out var columnasFk);
             columnasFk ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -70,7 +72,7 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
 
         foreach (var fk in esquema.LlavesForaneas)
         {
-            if (tablasOcultas.Contains(fk.TablaPadre) || tablasOcultas.Contains(fk.TablaHija)) continue;
+            if (EsOculta(fk.TablaPadre) || EsOculta(fk.TablaHija)) continue;
 
             var padre = "||";
             var hija = fk.HijaEsUnica

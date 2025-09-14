@@ -13,7 +13,8 @@
         <a class="btn btn-outline-primary"
            asp-controller="Relacional"
            asp-action="ModeloR"
-           asp-route-nombreBD="@nombreBD">
+           asp-route-nombreBD="@nombreBD"
+           asp-route-texto="true">
             Ver Modelo Relacional
         </a>
     <form asp-action="EliminarBase" method="post" onsubmit="return confirm('¿Eliminar la base restaurada?');">

@@ -18,7 +18,7 @@ public class RelacionalController : Controller
     
     
     [HttpGet]
-    public IActionResult ModeloR(string nombreBD)
+    public IActionResult ModeloR(string nombreBD, bool texto = true)
     {
         if (string.IsNullOrWhiteSpace(nombreBD))
         {
@@ -30,7 +30,10 @@ public class RelacionalController : Controller
         {
             var esquema = _lector.Leer(nombreBD);
             ViewBag.NombreBD = nombreBD;
-            ViewBag.MermaidRel = _diagramaRel.Construir(esquema);
+            ViewBag.EsTexto = texto;
+            ViewBag.ModeloRelacional = texto
+                ? VistaRelacionalTexto.Construir(esquema)
+                : _diagramaRel.Construir(esquema);
             return View();
         }
         catch (Exception ex)
