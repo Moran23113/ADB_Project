@@ -56,7 +56,6 @@
     <p class="text-muted">Selecciona Disyunción (Exclusiva/Solapada) y Totalidad (Total/Parcial) para cada jerarquía.</p>
 
     <form asp-action="GuardarChoices" method="post">
-        <!-- Enviar también la BD restaurada para guardar las elecciones ahí -->
         <input type="hidden" name="NombreBD" value="@nombreBD" />
 
         @foreach (var j in ambiguas)

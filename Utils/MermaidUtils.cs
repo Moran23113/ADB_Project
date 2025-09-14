@@ -1,11 +1,11 @@
 using System.Text.RegularExpressions;
 
-/// <summary>
-/// Utilidades compartidas para generar diagramas Mermaid.
-/// </summary>
+
+
+
 public static class MermaidUtils
 {
-    // Regex para sanear identificadores Mermaid.
+    
     private static readonly Regex _idBad = new("[^A-Za-z0-9_]", RegexOptions.Compiled);
 
   

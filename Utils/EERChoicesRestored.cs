@@ -4,15 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-/// <summary>
-/// Persistencia de elecciones EER (Disyunción / Totalidad) dentro de la BD restaurada.
-/// Crea y usa la tabla interna dbo.EER_UserChoices (clave compuesta: Supertype + SubtypesCsv).
-/// </summary>
+
 public static class EERChoicesRestored
 {
-    /// <summary>
-    /// Construye la cadena a la BD restaurada reutilizando servidor/credenciales de "SqlMaestra".
-    /// </summary>
+    
+    
+    
     public static string BuildCnnToRestoredDb(IConfiguration cfg, string nombreBD)
     {
         var csb = new SqlConnectionStringBuilder(cfg.GetConnectionString("SqlMaestra"));
@@ -20,9 +17,9 @@ public static class EERChoicesRestored
         return csb.ToString();
     }
 
-    /// <summary>
-    /// Asegura la existencia de dbo.EER_UserChoices en la BD (idempotente).
-    /// </summary>
+    
+    
+    
     public static async Task EnsureTableAsync(string cnn)
     {
         const string sql = @"
@@ -31,8 +28,8 @@ BEGIN
   CREATE TABLE dbo.EER_UserChoices (
     Supertype   nvarchar(200)  NOT NULL,
     SubtypesCsv nvarchar(2000) NOT NULL,
-    Disyuncion  nvarchar(20)   NOT NULL, -- 'Exclusive' | 'Overlapping'
-    Totalidad   nvarchar(20)   NOT NULL, -- 'Total' | 'Partial'
+    Disyuncion  nvarchar(20)   NOT NULL, 
+    Totalidad   nvarchar(20)   NOT NULL, 
     CONSTRAINT PK_EER_UserChoices PRIMARY KEY (Supertype, SubtypesCsv)
   );
 END";
@@ -42,9 +39,9 @@ END";
         await cmd.ExecuteNonQueryAsync();
     }
 
-    /// <summary>
-    /// Guarda (MERGE) las elecciones por Supertype/SubtypesCsv.
-    /// </summary>
+    
+    
+    
     public static async Task SaveChoicesAsync(
         string cnn,
         Dictionary<string, string> disyuncion,
@@ -79,9 +76,9 @@ VALUES (@sup, @subs, @dis, @tot);";
         }
     }
 
-    /// <summary>
-    /// Carga todas las elecciones almacenadas.
-    /// </summary>
+    
+    
+    
     public static async Task<List<(string sup, string subs, string dis, string tot)>> LoadChoicesAsync(string cnn)
     {
         await EnsureTableAsync(cnn);

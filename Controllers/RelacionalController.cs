@@ -13,10 +13,10 @@ public class RelacionalController : Controller
         _diagramaRel = diagramaRel;
     }
 
-    /// <summary>
-    /// Página principal del Modelo Relacional.
-    /// /Relacional?nombreBD=ER_XXXXXXXX
-    /// </summary>
+    
+    
+    
+    
     [HttpGet]
     public IActionResult ModeloR(string nombreBD)
     {

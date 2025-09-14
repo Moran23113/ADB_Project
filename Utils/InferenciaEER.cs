@@ -3,17 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-#region Modelos EER
 
-/// <summary>Estado de disyunción en la jerarquía EER.</summary>
+
 public enum EerDisjointness { Exclusive, Overlapping, Ambiguous }
-/// <summary>Estado de totalidad en la jerarquía EER.</summary>
+
 public enum EerTotalness { Total, Partial, Ambiguous }
 
-/// <summary>
-/// Jerarquía de especialización (EER) detectada:
-/// Supertipo, lista de Subtipos y heurísticas de Disyunción/Totalidad.
-/// </summary>
+
+
+
+
 public class JerarquiaEer
 {
     public string Supertipo { get; init; } = "";
@@ -23,29 +22,28 @@ public class JerarquiaEer
     public string? Evidencia { get; set; }
 }
 
-#endregion
 
-/// <summary>
-/// Motor de inferencia EER: detecta jerarquías por patrón PK=FK (FK UNIQUE) y
-/// renderiza un diagrama Mermaid con etiqueta de “especialización”.
-/// </summary>
+
+
+
+
 public static class InferenciaEER
 {
-    /// <summary>
-    /// Detecta jerarquías de especialización (subtipos) por el patrón PK=FK:
-    /// la FK en la hija es única y coincide (en orden) con la PK de la hija.
-    /// </summary>
-    /// <param name="s">Instantánea del esquema con tablas, columnas y FKs agrupadas.</param>
-    /// <returns>Lista de <see cref="JerarquiaEer"/> detectadas.</returns>
+    
+    
+    
+    
+    
+    
     public static List<JerarquiaEer> DetectarJerarquias(InstantaneaEsquema s)
     {
-        // PK por tabla (para comparar con columnas de las FK en hija)
+        
         var pkPorTabla = s.Tablas.ToDictionary(
             t => t.Nombre,
             t => s.Columnas.Where(c => c.Tabla == t.Nombre && c.EsPk).Select(c => c.Nombre).ToList(),
             StringComparer.OrdinalIgnoreCase);
 
-        // Candidatos a subtipo: FK única en hija y columnas FK == PK(hija)
+        
         var candidatos = s.LlavesForaneas.Where(fk =>
         {
             if (!fk.HijaEsUnica) return false;
@@ -55,7 +53,7 @@ public static class InferenciaEER
             return pkCols.SequenceEqual(fkCols, StringComparer.OrdinalIgnoreCase);
         }).ToList();
 
-        // Agrupar por padre → Supertipo; hijas → Subtipos
+        
         var grupos = candidatos.GroupBy(x => x.TablaPadre, StringComparer.OrdinalIgnoreCase);
         var lista = new List<JerarquiaEer>();
 
@@ -64,7 +62,7 @@ public static class InferenciaEER
             var j = new JerarquiaEer { Supertipo = g.Key };
             foreach (var fk in g) j.Subtipos.Add(fk.TablaHija);
 
-            // Heurística: discriminador NOT NULL en el supertipo → Disyunción exclusiva.
+            
             var disc = s.Columnas.FirstOrDefault(c =>
                 c.Tabla.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
                 (c.Nombre.Equals("Tipo", StringComparison.OrdinalIgnoreCase) ||
@@ -92,9 +90,9 @@ public static class InferenciaEER
         return lista;
     }
 
-    /// <summary>
-    /// Renderiza Mermaid (flowchart TB) para jerarquías EER con nodo “especialización”.
-    /// </summary>
+    
+    
+    
     public static string RenderMermaidEER(IReadOnlyList<JerarquiaEer> hs)
     {
         var sb = new StringBuilder();

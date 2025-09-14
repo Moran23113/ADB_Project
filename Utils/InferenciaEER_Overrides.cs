@@ -3,17 +3,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-/// <summary>
-/// Aplica las elecciones del usuario (persistidas) sobre las jerarquías EER detectadas.
-/// </summary>
+
+
+
 public static class InferenciaEER_Overrides
 {
-    /// <summary>
-    /// Carga elecciones (sup, subs, dis, tot) y sobreescribe Disyunción/Totalidad
-    /// en la lista de jerarquías. Marca la evidencia como “Elección del usuario aplicada.”.
-    /// </summary>
-    /// <param name="loadChoices">Función que retorna la lista persistida de elecciones.</param>
-    /// <param name="jerarquias">Jerarquías detectadas a modificar in place.</param>
+    
+    
+    
+    
+    
+    
     public static async Task AplicarOverridesAsync(
         Func<Task<List<(string sup, string subs, string dis, string tot)>>> loadChoices,
         List<JerarquiaEer> jerarquias)
