@@ -7,43 +7,93 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/ABD_Project.styles.css" asp-append-version="true" />
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        /* Navbar personalizado */
+        .navbar-custom {
+            background: linear-gradient(90deg, #0d6efd, #0a58ca);
+        }
+
+            .navbar-custom .nav-link {
+                color: #ffffff !important;
+                transition: all 0.3s ease;
+            }
+
+                .navbar-custom .nav-link:hover {
+                    color: #ffc107 !important;
+                    transform: scale(1.05);
+                }
+
+            .navbar-custom .navbar-brand {
+                color: #ffffff !important;
+                font-weight: bold;
+            }
+
+        .navbar-toggler {
+            border: none;
+        }
+
+            .navbar-toggler:focus {
+                box-shadow: none;
+            }
+
+        /* Footer */
+        footer {
+            background-color: #f8f9fa;
+            padding: 10px 0;
+        }
+    </style>
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-lg navbar-custom shadow-sm">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">ABD_Project</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <i class="bi bi-diagram-3-fill"></i> ABD_Project
+                </a>
+                <button class="navbar-toggler text-white" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <i class="bi bi-list fs-1"></i>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="DiagramaEr" asp-action="Subir">Diagrama ER/EER</a>
+                            <a class="nav-link" asp-area="" asp-controller="DiagramaEr" asp-action="Subir">
+                                <i class="bi bi-diagram-2"></i> Diagrama ER/EER
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Relacional" asp-action="ModeloR">Modelo Relacional</a>
+                            <a class="nav-link" asp-area="" asp-controller="Relacional" asp-action="ModeloR">
+                                <i class="bi bi-table"></i> Modelo Relacional
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Traductor" asp-action="Index">Traductor</a>
+                            <a class="nav-link" asp-area="" asp-controller="Traductor" asp-action="Index">
+                                <i class="bi bi-translate"></i> Traductor
+                            </a>
                         </li>
                     </ul>
                 </div>
             </div>
         </nav>
     </header>
+
     <div class="container">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2025 - ABD_Project - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+    <footer class="border-top text-muted">
+        <div class="container text-center">
+            &copy; 2025 - ABD_Project -
+            <a asp-area="" asp-controller="Home" asp-action="Privacy" class="text-decoration-none">
+                Privacy
+            </a>
         </div>
     </footer>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
