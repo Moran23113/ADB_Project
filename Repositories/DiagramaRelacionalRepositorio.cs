@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -24,7 +24,8 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
         "datetime" or "datetime2" => "datetime2",
         "decimal" or "numeric" => "decimal",
         "float" => "float",
-        "varchar" or "nvarchar" => "varchar",
+        // Recomendación: usa "string" para Mermaid
+        "varchar" or "nvarchar" or "char" or "nchar" or "text" or "ntext" => "string",
         _ => IdentificadorInvalido.Replace(tipo, "_")
     };
 
@@ -44,16 +45,26 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
             columnasFk ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             sb.AppendLine($"  {MermaidUtils.Sanitizar(tabla)} {{");
+
             foreach (var columna in esquema.Columnas.Where(c => c.Tabla == tabla))
             {
                 var tipo = MapearTipo(columna.Tipo);
                 var flags = new List<string>();
-                if (columna.EsPk) flags.Add("PK");
-                if (columnasFk.Contains(columna.Nombre)) flags.Add("FK");
-                if (columna.EsUnicoCandidato && !columna.EsPk) flags.Add("UK");
+
+                if (columna.EsPk)
+                    flags.Add("PK");
+
+                // 👇 Evita "PK FK" en la misma columna (Mermaid no lo acepta)
+                if (!columna.EsPk && columnasFk.Contains(columna.Nombre))
+                    flags.Add("FK");
+
+                if (columna.EsUnicoCandidato && !columna.EsPk)
+                    flags.Add("UK");
+
                 var sufijo = flags.Count > 0 ? " " + string.Join(" ", flags) : string.Empty;
                 sb.AppendLine($"    {MermaidUtils.Escapar(tipo)} {MermaidUtils.Escapar(columna.Nombre)}{sufijo}");
             }
+
             sb.AppendLine("  }");
         }
 
@@ -66,7 +77,8 @@ public class DiagramaRelacionalRepositorio : IDiagramaRelacionalRepositorio
                 ? (fk.HijaTodasNoNulas ? "||" : "o|")
                 : (fk.HijaTodasNoNulas ? "|{" : "o{");
 
-            sb.AppendLine($"  {MermaidUtils.Sanitizar(fk.TablaPadre)} {padre}--{hija} {MermaidUtils.Sanitizar(fk.TablaHija)} : \"{MermaidUtils.Escapar(fk.Nombre)}\"");
+            // 👇 Sin comillas en la etiqueta para evitar errores del parser
+            sb.AppendLine($"  {MermaidUtils.Sanitizar(fk.TablaPadre)} {padre}--{hija} {MermaidUtils.Sanitizar(fk.TablaHija)} : {MermaidUtils.Sanitizar(fk.Nombre)}");
         }
 
         return sb.ToString();
