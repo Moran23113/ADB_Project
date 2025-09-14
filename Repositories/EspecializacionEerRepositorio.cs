@@ -2,13 +2,13 @@ using Microsoft.Data.SqlClient;
 using System.Collections.Generic;
 using System.Linq;
 
-public interface IGeneralizacionEerRepositorio
+public interface IEspecializacionEerRepositorio
 {
     IEnumerable<int> ObtenerPadresSinHijo(string conexion, string entidadPadre, params string[] entidadesHija);
     int ObtenerIntersecciones(string conexion, string entidadPadre, params string[] entidadesHija);
 }
 
-public class GeneralizacionEerRepositorio : IGeneralizacionEerRepositorio
+public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
 {
     public IEnumerable<int> ObtenerPadresSinHijo(string conexion, string entidadPadre, params string[] entidadesHija)
     {
@@ -103,3 +103,4 @@ public class GeneralizacionEerRepositorio : IGeneralizacionEerRepositorio
         return (string)cmd.ExecuteScalar()!;
     }
 }
+

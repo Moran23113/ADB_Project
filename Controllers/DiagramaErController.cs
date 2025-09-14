@@ -9,7 +9,7 @@ public class DiagramaErController : Controller
     private readonly IRestauracionRepositorio _restaurador;
     private readonly IEsquemaRepositorio _lector;
     private readonly IDiagramaChenRepositorio _diagramaChen;
-    private readonly IGeneralizacionEerService _generalizacionService;
+    private readonly IEspecializacionEerService _especializacionService;
 
     public DiagramaErController(
         IWebHostEnvironment entorno,
@@ -17,14 +17,14 @@ public class DiagramaErController : Controller
         IRestauracionRepositorio restaurador,
         IEsquemaRepositorio lector,
         IDiagramaChenRepositorio diagramaChen,
-        IGeneralizacionEerService generalizacionService)
+        IEspecializacionEerService especializacionService)
     {
         _entorno = entorno;
         _cfg = cfg;
         _restaurador = restaurador;
         _lector = lector;
         _diagramaChen = diagramaChen;
-        _generalizacionService = generalizacionService;
+        _especializacionService = especializacionService;
     }
 
     [HttpGet]
@@ -67,7 +67,7 @@ public class DiagramaErController : Controller
 
             foreach (var jerarquia in jerarquias)
             {
-                var info = _generalizacionService.AnalizarGeneralizacion(
+                var info = _especializacionService.AnalizarEspecializacion(
                     cnnRestaurada,
                     jerarquia.Supertipo,
                     jerarquia.Subtipos.ToArray());
