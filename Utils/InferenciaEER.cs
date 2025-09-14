@@ -5,9 +5,9 @@ using System.Text;
 
 
 
-public enum EerDisjointness { Exclusive, Overlapping, Ambiguous }
+public enum EerDisjointness { Exclusiva, Solapada, Ambiguous }
 
-public enum EerTotalness { Total, Partial, Ambiguous }
+public enum EerTotalness { Total, Parcial, Ambiguous }
 
 
 
@@ -73,13 +73,13 @@ public static class InferenciaEER
 
             if (disc is not null && !disc.EsNulo)
             {
-                j.Disyuncion = EerDisjointness.Exclusive;
+                j.Disyuncion = EerDisjointness.Exclusiva;
                 j.Totalidad = EerTotalness.Ambiguous;
                 j.Evidencia = $"Discriminador {disc.Nombre} en {j.Supertipo} (NOT NULL).";
             }
             else
             {
-                j.Disyuncion = j.Subtipos.Count > 1 ? EerDisjointness.Overlapping : EerDisjointness.Ambiguous;
+                j.Disyuncion = j.Subtipos.Count > 1 ? EerDisjointness.Solapada : EerDisjointness.Ambiguous;
                 j.Totalidad = EerTotalness.Ambiguous;
                 j.Evidencia = "Subtipos detectados por patrón PK=FK (FK UNIQUE).";
             }
@@ -106,14 +106,14 @@ public static class InferenciaEER
         {
             var tagDis = h.Disyuncion switch
             {
-                EerDisjointness.Exclusive => "exclusive",
-                EerDisjointness.Overlapping => "overlapping",
+                EerDisjointness.Exclusiva => "exclusiva",
+                EerDisjointness.Solapada => "solapada",
                 _ => "ambiguous"
             };
             var tagTot = h.Totalidad switch
             {
                 EerTotalness.Total => "total",
-                EerTotalness.Partial => "partial",
+                EerTotalness.Parcial => "parcial",
                 _ => "ambiguous"
             };
 

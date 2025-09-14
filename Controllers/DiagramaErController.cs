@@ -72,8 +72,8 @@ public class DiagramaErController : Controller
                     jerarquia.Supertipo,
                     jerarquia.Subtipos.ToArray());
 
-                jerarquia.Totalidad = info.EsTotal ? EerTotalness.Total : EerTotalness.Partial;
-                jerarquia.Disyuncion = info.EsDisjunta ? EerDisjointness.Exclusive : EerDisjointness.Overlapping;
+                jerarquia.Totalidad = info.EsTotal ? EerTotalness.Total : EerTotalness.Parcial;
+                jerarquia.Disyuncion = info.EsDisjunta ? EerDisjointness.Exclusiva : EerDisjointness.Solapada;
             }
 
             ViewBag.MermaidEER = InferenciaEER.RenderMermaidEER(jerarquias);
