@@ -1,18 +1,27 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
 
 
+/// <summary>
+/// Indica si la especialización identificada es exclusiva (disjunta) o permite solapamientos.
+/// </summary>
 public enum EerDisjointness { Exclusiva, Solapada, Ambiguous }
 
+/// <summary>
+/// Representa si todos los registros del supertipo participan en la especialización (total o parcial).
+/// </summary>
 public enum EerTotalness { Total, Parcial, Ambiguous }
 
 
 
 
 
+/// <summary>
+/// Modelo que resume una jerarquía EER detectada a partir del esquema relacional.
+/// </summary>
 public class JerarquiaEer
 {
     public string Supertipo { get; init; } = "";
@@ -21,11 +30,9 @@ public class JerarquiaEer
     public EerTotalness Totalidad { get; set; } = EerTotalness.Ambiguous;
 }
 
-
-
-
-
-
+/// <summary>
+/// Rutinas de análisis que transforman el esquema relacional en componentes EER y generan diagramas Mermaid.
+/// </summary>
 public static class InferenciaEER
 {
     
@@ -34,15 +41,21 @@ public static class InferenciaEER
     
     
     
+    /// <summary>
+    /// Busca patrones de herencia en las tablas para deducir jerarquías EER.
+    /// </summary>
+    /// <param name="s">Instantánea del esquema relacional.</param>
     public static List<JerarquiaEer> DetectarJerarquias(InstantaneaEsquema s)
     {
-        
+        // Se construye un diccionario con las columnas que forman la PK de cada tabla.
         var pkPorTabla = s.Tablas.ToDictionary(
             t => t.Nombre,
             t => s.Columnas.Where(c => c.Tabla == t.Nombre && c.EsPk).Select(c => c.Nombre).ToList(),
             StringComparer.OrdinalIgnoreCase);
 
-        
+        // Se filtran las claves foráneas que cumplen con la característica de especialización:
+        // 1) La tabla hija tiene una FK única hacia la tabla padre.
+        // 2) La FK usa exactamente las mismas columnas que la PK de la tabla hija.
         var candidatos = s.LlavesForaneas.Where(fk =>
         {
             if (!fk.HijaEsUnica) return false;
@@ -52,7 +65,7 @@ public static class InferenciaEER
             return pkCols.SequenceEqual(fkCols, StringComparer.OrdinalIgnoreCase);
         }).ToList();
 
-        
+        // Agrupa las FKs por tabla padre: cada grupo potencial representa una jerarquía.
         var grupos = candidatos.GroupBy(x => x.TablaPadre, StringComparer.OrdinalIgnoreCase);
         var lista = new List<JerarquiaEer>();
 
@@ -61,7 +74,7 @@ public static class InferenciaEER
             var j = new JerarquiaEer { Supertipo = g.Key };
             foreach (var fk in g) j.Subtipos.Add(fk.TablaHija);
 
-            
+            // Busca una columna de discriminador común con nombres habituales para ajustar la disyunción.
             var disc = s.Columnas.FirstOrDefault(c =>
                 c.Tabla.Equals(j.Supertipo, StringComparison.OrdinalIgnoreCase) &&
                 (c.Nombre.Equals("Tipo", StringComparison.OrdinalIgnoreCase) ||
@@ -72,11 +85,13 @@ public static class InferenciaEER
 
             if (disc is not null && !disc.EsNulo)
             {
+                // Un discriminador NOT NULL indica que cada registro del supertipo cae exactamente en un subtipo.
                 j.Disyuncion = EerDisjointness.Exclusiva;
                 j.Totalidad = EerTotalness.Ambiguous;
             }
             else
             {
+                // Sin discriminador se asume solapamiento cuando hay más de un subtipo.
                 j.Disyuncion = j.Subtipos.Count > 1 ? EerDisjointness.Solapada : EerDisjointness.Ambiguous;
                 j.Totalidad = EerTotalness.Ambiguous;
             }
@@ -90,6 +105,9 @@ public static class InferenciaEER
     
     
     
+    /// <summary>
+    /// Convierte la jerarquía EER detectada en instrucciones Mermaid para su representación visual.
+    /// </summary>
     public static string RenderMermaidEER(IReadOnlyList<JerarquiaEer> hs)
     {
         var sb = new StringBuilder();
@@ -101,6 +119,7 @@ public static class InferenciaEER
         int k = 0;
         foreach (var h in hs)
         {
+            // Se traduce el estado de disyunción y totalidad a etiquetas de texto para el diagrama.
             var tagDis = h.Disyuncion switch
             {
                 EerDisjointness.Exclusiva => "exclusiva",
