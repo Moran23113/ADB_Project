@@ -6,6 +6,9 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Controlador que gestiona la restauración y generación del modelo relacional textual.
+/// </summary>
 public class RelacionalController : Controller
 {
     private readonly IWebHostEnvironment _entornoWeb;
@@ -28,9 +31,13 @@ public class RelacionalController : Controller
         _repositorioModeloRelacional = repositorioModeloRelacional;
     }
 
+    /// <summary>Muestra la vista para subir el respaldo.</summary>
     [HttpGet]
     public IActionResult Subir() => View();
 
+    /// <summary>
+    /// Restaura el respaldo con un prefijo específico y redirige a la vista del modelo relacional.
+    /// </summary>
     [HttpPost]
     [RequestSizeLimit(1_000_000_000)]
     public async Task<IActionResult> Subir(IFormFile archivoRespaldo)
@@ -41,18 +48,21 @@ public class RelacionalController : Controller
             return View();
         }
 
+        // Guarda el archivo de respaldo en una ubicación temporal.
         var carpetaSubida = _configuracion["Upload:Carpeta"] ?? "App_Data/Uploads";
         var rutaCarpetaSubida = Path.Combine(_entornoWeb.ContentRootPath, carpetaSubida);
         Directory.CreateDirectory(rutaCarpetaSubida);
 
         var rutaRespaldo = Path.Combine(rutaCarpetaSubida, $"{Guid.NewGuid():N}.bak");
 
+        // Copia el contenido subido al archivo temporal.
         using (var archivo = System.IO.File.Create(rutaRespaldo))
             await archivoRespaldo.CopyToAsync(archivo);
 
         string nombreBaseRestaurada = string.Empty;
         try
         {
+            // Restaurar la base con prefijo REL para diferenciarla de las usadas en los diagramas.
             nombreBaseRestaurada = await _repositorioRestauracion.RestaurarAsync(rutaRespaldo, "REL");
             return RedirectToAction("ModeloR", new { nombreBD = nombreBaseRestaurada });
         }
@@ -63,10 +73,14 @@ public class RelacionalController : Controller
         }
         finally
         {
+            // El archivo temporal se elimina siempre que sea posible.
             try { System.IO.File.Delete(rutaRespaldo); } catch { }
         }
     }
 
+    /// <summary>
+    /// Lee el esquema de la base restaurada y construye la salida textual del modelo relacional.
+    /// </summary>
     [HttpGet]
     public IActionResult ModeloR(string nombreBD)
     {
@@ -90,6 +104,7 @@ public class RelacionalController : Controller
         }
     }
 
+    /// <summary>Permite limpiar manualmente la base restaurada una vez generada la documentación.</summary>
     [HttpPost]
     public async Task<IActionResult> EliminarBase(string nombreBD)
     {

@@ -1,13 +1,19 @@
 using System.Text.RegularExpressions;
 
+/// <summary>
+/// Define las operaciones del traductor bidireccional entre álgebra relacional y SQL.
+/// </summary>
 public interface ITraductorRepositorio
 {
+    /// <summary>Convierte expresiones en álgebra relacional extendida a instrucciones SQL.</summary>
     string AlgebraRelacionalASql(string entrada);
+    /// <summary>Convierte sentencias SQL sencillas a su equivalente en álgebra relacional.</summary>
     string SqlAAlgebraRelacional(string entrada);
 }
 
 public class TraductorRepositorio : ITraductorRepositorio
 {
+    // Expresiones regulares que capturan los diferentes operadores de álgebra relacional soportados.
     private static readonly Regex SeleccionRegex = new(@"^σ_\{(.+?)\}\((.+)\)$", RegexOptions.Compiled);
     private static readonly Regex ProyeccionRegex = new(@"^π_\{(.+?)\}\((.+)\)$", RegexOptions.Compiled);
     private static readonly Regex UnionNaturalRegex = new(@"^(.+)\s*⋈_\{(.+?)\}\s*(.+)$", RegexOptions.Compiled);
@@ -15,6 +21,7 @@ public class TraductorRepositorio : ITraductorRepositorio
     private static readonly Regex DiferenciaRegex = new(@"^(.+)\s*−\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex DivisionRegex = new(@"DIV\((.+); by\[(.+)\]; keep\[(.+)\]\)", RegexOptions.Compiled);
 
+    // Expresiones regulares para reconocer patrones comunes de SQL SELECT / JOIN / UNION.
     private static readonly Regex SqlSeleccionRegex = new(@"^SELECT (.+) FROM (\w+)(?:\s+(\w+))? WHERE (.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SqlProyeccionRegex = new(@"^SELECT (.+) FROM (\w+)(?:\s+(\w+))?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SqlUnionNaturalWhereRegex = new(@"^SELECT (.+) FROM (\w+)(?:\s+(\w+))? JOIN (\w+)(?:\s+(\w+))? ON (.+) WHERE (.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -24,6 +31,7 @@ public class TraductorRepositorio : ITraductorRepositorio
 
     public string AlgebraRelacionalASql(string algebra)
     {
+        // Normaliza la entrada eliminando espacios sobrantes y puntos y coma finales.
         algebra = algebra.Trim().TrimEnd(';');
 
         var seleccion = SeleccionRegex.Match(algebra);
@@ -33,15 +41,18 @@ public class TraductorRepositorio : ITraductorRepositorio
             var proyeccionInterna = ProyeccionRegex.Match(cuerpo);
             if (proyeccionInterna.Success)
             {
+                // Caso: σ{cond}(π{campos}(R)) -> SELECT campos FROM R WHERE cond
                 var cuerpoProyeccion = proyeccionInterna.Groups[2].Value.Trim();
                 var unionInterna = UnionNaturalRegex.Match(cuerpoProyeccion);
                 if (unionInterna.Success)
+                    // Caso: selección sobre un JOIN representado con ⋈.
                     return $"SELECT {proyeccionInterna.Groups[1].Value} FROM {unionInterna.Groups[1].Value.Trim()} JOIN {unionInterna.Groups[3].Value.Trim()} ON {unionInterna.Groups[2].Value.Trim()} WHERE {seleccion.Groups[1].Value}";
                 return $"SELECT {proyeccionInterna.Groups[1].Value} FROM {cuerpoProyeccion} WHERE {seleccion.Groups[1].Value}";
             }
 
             var unionInternaDentro = UnionNaturalRegex.Match(cuerpo);
             if (unionInternaDentro.Success)
+                // Selección directamente sobre un JOIN.
                 return $"SELECT * FROM {unionInternaDentro.Groups[1].Value.Trim()} JOIN {unionInternaDentro.Groups[3].Value.Trim()} ON {unionInternaDentro.Groups[2].Value.Trim()} WHERE {seleccion.Groups[1].Value}";
 
             return $"SELECT * FROM {cuerpo} WHERE {seleccion.Groups[1].Value}";
@@ -53,10 +64,12 @@ public class TraductorRepositorio : ITraductorRepositorio
             var cuerpo = proyeccion.Groups[2].Value.Trim();
             var seleccionInterna = SeleccionRegex.Match(cuerpo);
             if (seleccionInterna.Success)
+                // π{campos}(σ{cond}(R)) -> SELECT campos FROM R WHERE cond
                 return $"SELECT {proyeccion.Groups[1].Value} FROM {seleccionInterna.Groups[2].Value} WHERE {seleccionInterna.Groups[1].Value}";
 
             var unionInterna = UnionNaturalRegex.Match(cuerpo);
             if (unionInterna.Success)
+                // π{campos}(R ⋈_{cond} S) -> SELECT campos FROM R JOIN S ON cond
                 return $"SELECT {proyeccion.Groups[1].Value} FROM {unionInterna.Groups[1].Value.Trim()} JOIN {unionInterna.Groups[3].Value.Trim()} ON {unionInterna.Groups[2].Value.Trim()}";
 
             return $"SELECT {proyeccion.Groups[1].Value} FROM {cuerpo}";
@@ -64,14 +77,17 @@ public class TraductorRepositorio : ITraductorRepositorio
 
         var unionNatural = UnionNaturalRegex.Match(algebra);
         if (unionNatural.Success)
+            // R ⋈_{cond} S -> SELECT * FROM R JOIN S ON cond
             return $"SELECT * FROM {unionNatural.Groups[1].Value.Trim()} JOIN {unionNatural.Groups[3].Value.Trim()} ON {unionNatural.Groups[2].Value.Trim()}";
 
         var unionConjuntos = UnionRegex.Match(algebra);
         if (unionConjuntos.Success)
+            // Unión de conjuntos.
             return $"SELECT * FROM {unionConjuntos.Groups[1].Value.Trim()} UNION SELECT * FROM {unionConjuntos.Groups[2].Value.Trim()}";
 
         var diferencia = DiferenciaRegex.Match(algebra);
         if (diferencia.Success)
+            // Diferencia de conjuntos.
             return $"SELECT * FROM {diferencia.Groups[1].Value.Trim()} EXCEPT SELECT * FROM {diferencia.Groups[2].Value.Trim()}";
 
         var division = DivisionRegex.Match(algebra);
@@ -80,6 +96,7 @@ public class TraductorRepositorio : ITraductorRepositorio
             var tabla = division.Groups[1].Value.Trim();
             var por = division.Groups[2].Value.Trim();
             var conservar = division.Groups[3].Value.Trim();
+            // Traducción de DIV basada en el patrón clásico con doble NOT EXISTS.
             return $@"SELECT DISTINCT {conservar}
 FROM {tabla} AS A
 WHERE NOT EXISTS (
@@ -96,14 +113,17 @@ WHERE NOT EXISTS (
 
     public string SqlAAlgebraRelacional(string sql)
     {
+        // Normaliza la sentencia SQL previa a los análisis con expresiones regulares.
         sql = sql.Trim().TrimEnd(';');
 
         var unionSql = SqlUnionRegex.Match(sql);
         if (unionSql.Success)
+            // UNION en SQL -> unión de conjuntos en álgebra.
             return $"({SqlAAlgebraRelacional(unionSql.Groups[1].Value)}) ∪ ({SqlAAlgebraRelacional(unionSql.Groups[2].Value)})";
 
         var exceptoSql = SqlExceptoRegex.Match(sql);
         if (exceptoSql.Success)
+            // EXCEPT -> diferencia de conjuntos.
             return $"({SqlAAlgebraRelacional(exceptoSql.Groups[1].Value)}) − ({SqlAAlgebraRelacional(exceptoSql.Groups[2].Value)})";
 
         var unionNaturalWhereSql = SqlUnionNaturalWhereRegex.Match(sql);
@@ -115,6 +135,7 @@ WHERE NOT EXISTS (
             var alias2 = unionNaturalWhereSql.Groups[5].Value.Trim();
             var izquierda = string.IsNullOrEmpty(alias1) ? tabla1 : $"{tabla1} {alias1}";
             var derecha = string.IsNullOrEmpty(alias2) ? tabla2 : $"{tabla2} {alias2}";
+            // SELECT ... JOIN ... WHERE ... -> σ(π(R ⋈ S)).
             return $"σ_{{{unionNaturalWhereSql.Groups[7].Value.Trim()}}}(π_{{{unionNaturalWhereSql.Groups[1].Value.Trim()}}}({izquierda} ⋈_{{{unionNaturalWhereSql.Groups[6].Value.Trim()}}} {derecha}))";
         }
 
@@ -124,6 +145,7 @@ WHERE NOT EXISTS (
             var tabla = seleccion.Groups[2].Value.Trim();
             var alias = seleccion.Groups[3].Value.Trim();
             var tablaResuelta = string.IsNullOrEmpty(alias) ? tabla : $"{tabla} {alias}";
+            // SELECT ... WHERE ... -> σ(π(R)).
             return $"σ_{{{seleccion.Groups[4].Value.Trim()}}}(π_{{{seleccion.Groups[1].Value.Trim()}}}({tablaResuelta}))";
         }
 
@@ -136,6 +158,7 @@ WHERE NOT EXISTS (
             var alias2 = unionNaturalSql.Groups[5].Value.Trim();
             var izquierda = string.IsNullOrEmpty(alias1) ? tabla1 : $"{tabla1} {alias1}";
             var derecha = string.IsNullOrEmpty(alias2) ? tabla2 : $"{tabla2} {alias2}";
+            // SELECT ... JOIN ... ON ... -> π(R ⋈ S).
             return $"π_{{{unionNaturalSql.Groups[1].Value.Trim()}}}({izquierda} ⋈_{{{unionNaturalSql.Groups[6].Value.Trim()}}} {derecha})";
         }
 
@@ -145,6 +168,7 @@ WHERE NOT EXISTS (
             var tabla = proyeccionSql.Groups[2].Value.Trim();
             var alias = proyeccionSql.Groups[3].Value.Trim();
             var tablaResuelta = string.IsNullOrEmpty(alias) ? tabla : $"{tabla} {alias}";
+            // SELECT ... FROM ... -> π(R).
             return $"π_{{{proyeccionSql.Groups[1].Value.Trim()}}}({tablaResuelta})";
         }
 

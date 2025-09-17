@@ -3,8 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+/// <summary>
+/// Expone la capacidad de transformar un esquema relacional en instrucciones Mermaid de un ER (Chen).
+/// </summary>
 public interface IDiagramaChenRepositorio
 {
+    /// <summary>
+    /// Construye la definición Mermaid para representar entidades, atributos y relaciones.
+    /// </summary>
     string Construir(InstantaneaEsquema esquema);
 }
 
@@ -15,6 +21,7 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
 
     public string Construir(InstantaneaEsquema esquema)
     {
+        // Se arma el encabezado del diagrama Mermaid, declarando estilos reutilizables para cada elemento.
         var sb = new StringBuilder();
         sb.AppendLine("flowchart LR");
         sb.AppendLine("classDef entidad fill:#eef,stroke:#334,stroke-width:1px,rx:8,ry:8;");
@@ -23,6 +30,7 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
         sb.AppendLine("classDef clave font-weight:bold,text-decoration:underline;");
         sb.AppendLine("classDef unico stroke-dasharray:3 2;");
 
+        // Se renderizan por separado entidades, relaciones binarias y relaciones M:N para mantener el código organizado.
         RenderizarEntidades(sb, esquema);
         RenderizarRelacionesBinarias(sb, esquema);
         RenderizarRelacionesMuchosAMuchos(sb, esquema);
@@ -37,6 +45,7 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
             if (TablasIgnoradas.Contains(tabla.Nombre)) continue;
             if (esquema.TablasUnionMuchosAMuchos.Contains(tabla.Nombre)) continue;
 
+            // Cada tabla se convierte en un nodo "entidad" y se le agregan nodos hijos por cada columna.
             var idEntidad = MermaidUtils.Sanitizar(tabla.Nombre);
             sb.AppendLine($"  {idEntidad}[{MermaidUtils.Escapar(tabla.Nombre)}]:::entidad");
 
@@ -45,9 +54,11 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
                 var idAtributo = $"{idEntidad}__{MermaidUtils.Sanitizar(columna.Nombre)}";
                 sb.AppendLine($"  {idAtributo}(({MermaidUtils.Escapar(columna.Nombre)})):::atributo");
 
+                // Se asignan clases CSS para resaltar claves primarias o candidatos únicos.
                 if (columna.EsPk) sb.AppendLine($"  class {idAtributo} clave;");
                 else if (columna.EsUnicoCandidato) sb.AppendLine($"  class {idAtributo} unico;");
 
+                // El atributo se conecta visualmente con su entidad.
                 sb.AppendLine($"  {idAtributo} --- {idEntidad}");
             }
         }
@@ -61,6 +72,7 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
             if (TablasIgnoradas.Contains(relacion.TablaPadre) || TablasIgnoradas.Contains(relacion.TablaHija)) continue;
             if (esquema.TablasUnionMuchosAMuchos.Contains(relacion.TablaHija)) continue;
 
+            // Cada relación se modela como un rombo y se le asocia un identificador único incremental.
             var idRelacion = $"REL_{contador++}_{MermaidUtils.Sanitizar(relacion.Nombre)}";
             sb.AppendLine($"  {idRelacion}{{{{{MermaidUtils.Escapar(relacion.Nombre)}}}}}:::relacion");
             sb.AppendLine($"  {MermaidUtils.Sanitizar(relacion.TablaPadre)} -- \"1\" --> {idRelacion}");
@@ -69,6 +81,7 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
                 ? (relacion.HijaTodasNoNulas ? "1" : "0..1")
                 : (relacion.HijaTodasNoNulas ? "1..N" : "0..N");
 
+            // Cuando la tabla hija admite valores nulos se utilizan líneas punteadas para indicar opcionalidad.
             if (relacion.HijaTodasNoNulas)
                 sb.AppendLine($"  {idRelacion} -- \"{multiplicidad}\" --> {MermaidUtils.Sanitizar(relacion.TablaHija)}");
             else
@@ -82,6 +95,7 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
         {
             if (TablasIgnoradas.Contains(tablaPuente)) continue;
 
+            // Una tabla puente debe tener exactamente dos claves foráneas para que se interprete como relación M:N.
             var padres = esquema.LlavesForaneas
                 .Where(f => f.TablaHija == tablaPuente)
                 .Select(f => f.TablaPadre)
@@ -93,9 +107,11 @@ public class DiagramaChenRepositorio : IDiagramaChenRepositorio
                 var idRelacion = $"MN_{MermaidUtils.Sanitizar(tablaPuente)}";
                 sb.AppendLine($"  {idRelacion}{{{{{MermaidUtils.Escapar(tablaPuente)}}}}}:::relacion");
 
+                // Se conectan ambos padres con multiplicidad "1..N" para reflejar la cardinalidad típica de una tabla puente.
                 sb.AppendLine($"  {MermaidUtils.Sanitizar(padres[0])} -- \"1..N\" --> {idRelacion}");
                 sb.AppendLine($"  {idRelacion} -- \"1..N\" --> {MermaidUtils.Sanitizar(padres[1])}");
 
+                // Las columnas no involucradas en las FKs se muestran como atributos propios de la relación M:N.
                 var columnasFk = new HashSet<string>(
                     esquema.LlavesForaneas.Where(f => f.TablaHija == tablaPuente)
                         .SelectMany(f => f.ColumnasHijaCsv.Split(',').Select(x => x.Trim())),

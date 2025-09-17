@@ -4,9 +4,14 @@ using Microsoft.SqlServer.Management.Smo;
 using System.Collections.Generic;
 using System.Linq;
 
+/// <summary>
+/// Operaciones de bajo nivel para inspeccionar especializaciones EER directamente en SQL Server.
+/// </summary>
 public interface IEspecializacionEerRepositorio
 {
+    /// <summary>Obtiene los identificadores del supertipo que no aparecen en ningún subtipo.</summary>
     IEnumerable<int> ObtenerPadresSinHijo(string conexion, string entidadPadre, params string[] entidadesHija);
+    /// <summary>Calcula cuántos registros aparecen en más de un subtipo (intersecciones).</summary>
     int ObtenerIntersecciones(string conexion, string entidadPadre, params string[] entidadesHija);
 }
 
@@ -14,6 +19,7 @@ public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
 {
     public IEnumerable<int> ObtenerPadresSinHijo(string conexion, string entidadPadre, params string[] entidadesHija)
     {
+        // Esta consulta identifica participación total comparando la tabla padre con la unión de sus subtipos.
         var resultado = new List<int>();
         using var cn = new SqlConnection(conexion);
         cn.Open();
@@ -25,6 +31,7 @@ public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
         var selects = new List<string>();
         foreach (var hija in entidadesHija)
         {
+            // Para cada subtipo se obtiene la columna FK que referencia al supertipo.
             var columnaFk = ObtenerColumnaFk(bd, hija, entidadPadre);
             selects.Add($"SELECT {columnaFk} AS IdPadre FROM {hija}");
         }
@@ -37,6 +44,7 @@ public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
             LEFT JOIN ({joinedChildren}) h ON p.{columnaPk} = h.IdPadre
             WHERE h.IdPadre IS NULL";
 
+        // Ejecuta la consulta y recolecta los identificadores que no tienen correspondencia en los subtipos.
         using var cmd = new SqlCommand(sql, cn);
         using var rd = cmd.ExecuteReader();
         while (rd.Read())
@@ -57,6 +65,7 @@ public class EspecializacionEerRepositorio : IEspecializacionEerRepositorio
         {
             for (int j = i + 1; j < entidadesHija.Length; j++)
             {
+                // Se obtienen las columnas FK de ambos subtipos y se realiza un JOIN para contar registros comunes.
                 var fk1 = ObtenerColumnaFk(bd, entidadesHija[i], entidadPadre);
                 var fk2 = ObtenerColumnaFk(bd, entidadesHija[j], entidadPadre);
 
