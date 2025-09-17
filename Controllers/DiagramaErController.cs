@@ -34,9 +34,11 @@ public class DiagramaErController : Controller
     [RequestSizeLimit(1_000_000_000)]
     public async Task<IActionResult> Subir(IFormFile archivoRespaldo)
     {
-        if (archivoRespaldo == null || archivoRespaldo.Length == 0)
+        if (archivoRespaldo == null
+     || archivoRespaldo.Length == 0
+     || !string.Equals(Path.GetExtension(archivoRespaldo.FileName), ".bak", StringComparison.OrdinalIgnoreCase))
         {
-            ModelState.AddModelError("", "Sube un archivo .bak");
+            ModelState.AddModelError("", "Sube un archivo .bak válido");
             return View();
         }
 
